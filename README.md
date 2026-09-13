@@ -24,8 +24,13 @@ MoonBit 核心引擎（评测 / 标注 / 分析 / 数据 —— 纯函数，JSON
 
 ## 快速开始（引擎侧）
 
+**Windows 一键验收**：双击项目根目录的 `verify.bat`，会自动跑完下面 5 条命令并暂停显示结果。
+
+手动方式（需先把 MoonBit 加入 PATH：`C:\Users\<你>\.moon\bin`）：
+
 ```bash
 cd core
+moon version            # 确认工具链
 moon check              # 类型检查
 moon test               # 单元测试
 moon run cmd/main       # 运行 CLI 自检 → 输出 "EvalHub core OK"
