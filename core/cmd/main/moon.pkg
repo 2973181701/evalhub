@@ -1,0 +1,5 @@
+// import {
+//   "chenshijie/core" @lib,
+// }
+
+pkgtype(kind: "executable")

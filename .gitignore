@@ -1,0 +1,22 @@
+# ===== 密钥安全（最高优先级，永远不要提交）=====
+config.json
+*.key
+.env
+.env.*
+
+# ===== 依赖 =====
+node_modules/
+
+# ===== MoonBit 构建产物 =====
+_build/
+*.core
+target/
+
+# ===== 前端/后端构建产物 =====
+dist/
+build/
+
+# ===== 日志与系统垃圾 =====
+*.log
+.DS_Store
+Thumbs.db
