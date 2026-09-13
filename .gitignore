@@ -11,6 +11,8 @@ node_modules/
 _build/
 *.core
 target/
+.mooncakes/
+.moonagent/
 
 # ===== 前端/后端构建产物 =====
 dist/

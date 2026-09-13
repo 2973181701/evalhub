@@ -1,13 +1,6 @@
-// Learn more about moon.mod configuration:
-// https://docs.moonbitlang.com/en/latest/toolchain/moon/module.html
-//
-// To add a dependency, run this command in your terminal:
-//   moon add moonbitlang/x
-//
-// Or manually declare it in `import`, for example:
-// import {
-//   "moonbitlang/x@0.4.6",
-// }
+// EvalHub 核心引擎（MoonBit）
+// 设计原则：纯函数 —— 输入 JSON 字符串，输出 JSON 字符串；不碰网络、不碰 DOM。
+// 参考：https://docs.moonbitlang.com/en/latest/toolchain/moon/module.html
 
 name = "evalhub/core"
 
@@ -19,8 +12,8 @@ repository = ""
 
 license = "MIT"
 
-keywords = []
+keywords = ["llm", "evaluation", "annotation", "rlhf", "moonbit"]
 
-preferred_target = "wasm"
+preferred_target = "js"
 
-description = "EvalHub core engines: evaluation, annotation, analysis, data conversion (pure functions, JSON in / JSON out)"
+description = "EvalHub core engines: eval / annotate / analyze / data (pure functions, JSON in & out)"

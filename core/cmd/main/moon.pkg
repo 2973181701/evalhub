@@ -1,5 +1,5 @@
-// import {
-//   "chenshijie/core" @lib,
-// }
+import {
+  "evalhub/core/src" @engine,
+}
 
 pkgtype(kind: "executable")
