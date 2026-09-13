@@ -1,7 +1,7 @@
 @echo off
 setlocal
 chcp 65001 >nul
-title EvalHub - Stage 0 Verification
+title EvalHub - Stage 0/1 Verification
 
 set "MOONBIN=%USERPROFILE%\.moon\bin"
 if not exist "%MOONBIN%\moon.exe" (
@@ -21,35 +21,44 @@ if errorlevel 1 (
 
 echo.
 echo ==================================================
-echo    EvalHub  -  Stage 0 Verification
+echo    EvalHub  -  Stage 0/1 Verification
 echo ==================================================
 echo    MoonBit dir : %MOONBIN%
 echo    Project dir : %CD%
 echo ==================================================
 echo.
 
-echo [1/5] moon version
+echo [1/6] moon version
 call moon version
 echo.
 
-echo [2/5] moon check
+echo [2/6] moon check
 call moon check
 echo.
 
-echo [3/5] moon test
+echo [3/6] moon test
 call moon test
 echo.
 
-echo [4/5] moon run cmd/main
+echo [4/6] moon run cmd/main
 call moon run cmd/main
 echo.
 
-echo [5/5] moon build --target js
+echo [5/6] moon build --target js
 call moon build --target js
 echo.
 
+cd /d "%~dp0"
+echo [6/6] node tools/engine_smoke.mjs  (Node imports the MoonBit engine)
+if exist "tools\engine_smoke.mjs" (
+  call node tools\engine_smoke.mjs
+) else (
+  echo [SKIP] tools\engine_smoke.mjs not found.
+)
+echo.
+
 echo ==================================================
-echo    DONE.  Expect 5 sections above.
+echo    DONE.  Expect 6 sections above.
 echo    Pass = no line starting with "Error:"
 echo ==================================================
 echo.

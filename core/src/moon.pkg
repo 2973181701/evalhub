@@ -1,11 +1,13 @@
 // EvalHub core / src 包
-// 阶段 0：仅暴露 version()，用于打通工具链
-// 阶段 1+：会 import "moonbitlang/core/json"，并在此处补充 link.js.exports 的引擎函数
+// 评测 / 标注 / 分析 / 数据 四引擎都在本包（exports 只对本包构件生效）
+import {
+  "moonbitlang/core/json",
+}
 
 options(
   link: {
     "js": {
-      "exports": ["version"],
+      "exports": ["version", "eval_engine"],
       "format": "esm",
     },
   },
