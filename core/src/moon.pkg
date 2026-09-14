@@ -1,5 +1,3 @@
-// EvalHub core / src 包
-// 评测 / 标注 / 分析 / 数据 四引擎都在本包（exports 只对本包构件生效）
 import {
   "moonbitlang/core/json",
 }
@@ -16,6 +14,22 @@ options(
         "export_rlhf",
       ],
       "format": "esm",
+    },
+    "wasm-gc": {
+      "exports": [
+        "version",
+        "eval_engine",
+        "annotate_engine",
+        "analyze_engine",
+        "consistency_engine",
+        "export_rlhf",
+        "abi_clear",
+        "abi_push",
+        "abi_len",
+        "abi_read",
+        "abi_run",
+        "abi_version",
+      ],
     },
   },
 )

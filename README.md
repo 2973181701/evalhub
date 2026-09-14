@@ -2,7 +2,7 @@
 
 > **用 MoonBit 写核心引擎，Vue 3 写前端**，让「**评测发现模型问题 → 标注偏好数据 → 生成分析报告 → 导出 RLHF 训练数据**」形成闭环。
 >
-> 状态：**四个引擎全部完成 + 后端 + 前端全部跑通** ｜ 引擎单测 **60/60 通过** ｜ 全部数字来自真实数据，可逐项复现
+> 状态：**四个引擎全部完成 + 后端 + 前端全部跑通 + WASM 目标已验证** ｜ 引擎单测 **75/75 通过** ｜ 全部数字来自真实数据，可逐项复现
 
 ---
 
@@ -44,9 +44,45 @@
 
 ### 为什么这么分层（面试必讲）
 
-1. **引擎是纯函数**：输入输出都是 JSON 字符串，没有全局状态、没有副作用 → 可以脱离网络和浏览器**单测**，也可以被任何语言调用（现在是 JS，未来换 WASM 目标不用改业务代码）。
+1. **引擎是纯函数**：输入输出都是 JSON 字符串，没有全局状态、没有副作用 → 可以脱离网络和浏览器**单测**，也可以被任何语言调用。**这条设计原则已经被验证**：同一套源码除了编成 JS，还编成了自包含的 WASM，两形态输出逐字符一致（见下）。
 2. **网关只做编排**：唯一需要网络的环节（调大模型）放在网关，引擎完全不感知网络 → 引擎的测试不需要 mock HTTP。
 3. **规则单点定义**：曾被这个问题咬过——网关层「顺手」过滤了一次平手样本，导致导出计数和引擎对不上（详见 `docs/踩坑记录.md` 坑 23）。修正后所有业务规则只在 MoonBit 里写一遍。
+
+### 同一套源码，两种编译目标
+
+引擎源码只写一份，`moon build` 换目标即可：
+
+| 目标 | 产物 | 体积 | 依赖 | 用途 |
+|---|---|---|---|---|
+| `--target js` | `src.js`（ESM） | 96 KB | 无 | **当前生产路径**，Node 直接 `import` |
+| `--target wasm-gc` | `src.wasm` | 171 KB | **0 个导入** | 已验证：可嵌入任何 WASM 宿主 |
+
+**关键难点：WebAssembly 没有跨边界的字符串类型。**
+
+wasm-gc 里 MoonBit 的 `String` 是 GC 结构体，JS 侧既造不出也读不出，直接传会报
+`TypeError: type incompatibility when transforming from/to JS`。这是 WASM 的固有边界，
+不是 MoonBit 的缺陷——Rust 用 wasm-bindgen、C 用手动指针+长度、Go 用 syscall/js，
+每个语言都得自己适配。本版本 MoonBit 不带 JS glue，所以项目自己写了最小适配层
+`core/src/engine_wasm_abi.mbt`：**码点缓冲 + 索引寻址，只传 `Int`**。
+
+```
+JS 侧                                    MoonBit 侧
+abi_clear()                       →      清空缓冲区
+abi_push(cp)   × N                →      逐个追加输入码点
+abi_run(op)                       →      跑引擎，结果写回缓冲区
+abi_len() / abi_read(i)  × N      →      逐个读出输出码点
+```
+
+> ⚠️ **一个真踩到的坑**：搬的必须是**码点**（`codePointAt`），不是 UTF-16 码元（`charCodeAt`）。
+> MoonBit 的 `Char` 是 32 位完整码点，代理区码元会被 `Int::to_char` 判为非法并替换成 U+FFFD
+> ——emoji 就这么丢了。`"加油💪".length()` 是 4（码元）但 `for ch in s` 只迭代 3 次（码点），
+> 这个差异是实测出来的。详见 `docs/踩坑记录.md` 坑 29。
+
+正确性不靠「编出来了」宣称，靠两处独立验证：
+
+```bash
+node tools/wasm_smoke.mjs    # 用真实数据把两形态输出逐字符比对 → 64 / 64 一致
+```
 
 ---
 
@@ -128,9 +164,10 @@
 
 ```bash
 cd core
-moon check                # 类型检查
-moon test                 # 单元测试 → Total tests: 60, passed: 60, failed: 0
-moon build --target js    # 编译成 ESM JavaScript，供 Node 直接 import
+moon check                          # 类型检查
+moon test                           # 单元测试 → Total tests: 75, passed: 75, failed: 0
+moon build --target js              # 编译成 ESM JavaScript，供 Node 直接 import
+moon build --target wasm-gc         # 可选：编译成自包含 .wasm（171 KB，0 依赖）
 cd ..
 ```
 
@@ -224,7 +261,9 @@ A/B 双栏对比（A 版 2 字、B 版 581 字），选偏好 → 填理由 → 
 
 | 指标 | 数值 |
 |---|---|
-| MoonBit 引擎单元测试 | **60 / 60 通过** |
+| MoonBit 引擎单元测试 | **75 / 75 通过** |
+| WASM 形态一致性比对 | **64 / 64 通过**（`wasm-gc` 与 `js` 输出逐字符一致） |
+| WASM 产物 | **171.4 KB**，12 个导出、**0 个导入**（自包含，无 JS glue） |
 | 五维均分 | 准确性 2.67 / 完整性 3.70 / 逻辑性 3.45 / 安全性 4.95 / 表达质量 4.40 |
 | 总分均分 | **3.84 / 5** |
 | 分题型均分 | 事实问答 4.18 / 逻辑推理 3.83 / 文本摘要 3.00 / 情感分析 4.43 / 代码生成 3.80 / 创意写作 3.67 |
@@ -264,9 +303,18 @@ A/B 双栏对比（A 版 2 字、B 版 581 字），选偏好 → 填理由 → 
 
 报告里那个「人工 vs 规则引擎」的一致率是**两个真实评分者**的真实结果，可以直接写进材料——但它衡量的是「人与规则的差异」，不能当成人际一致性。
 
-### 4. 未做的部分
+### 4. 已做与未做
 
-- `moon build --target wasm`（Wasm 目标）：架构已按纯函数设计、天然可切，但本期先跑通 JS 目标，WASM 列为后续项。
+**已做（Wasm 目标已跑通并验证）**
+
+- `moon build --target wasm-gc` 产出 **171.4 KB 自包含 `.wasm`**（12 个导出函数、**0 个导入**，不依赖任何 JS glue）。
+- 因为 WebAssembly 没有跨边界字符串类型，额外写了最小适配层 `src/engine_wasm_abi.mbt`（码点缓冲 + 索引寻址，只传 `Int`），把五个引擎搬到 WASM 侧。
+- `node tools/wasm_smoke.mjs` 用**真实数据**把两种目标逐字符比对：**64 项全部一致**。含非 BMP 字符（emoji / 生僻字）双向往返用例。详见 `docs/踩坑记录.md` 坑 28–30。
+
+**未做（诚实声明）**
+
+- 生产环境仍跑 JS 目标。WASM 形态是**已验证可行的能力**，不是当前运行路径——后端直接 `import` JS 产物更简单，WASM 的价值在于「引擎可脱离 JS 运行时、以二进制形态嵌入任何宿主」。
+- 后端未接 WASM。若要用，`tools/wasm_smoke.mjs` 里的 `wasmCall()` 就是现成的调用封装。
 - LLM-as-Judge：接口层已预留（评测引擎的可插拔断言设计就是为它准备的），本期未接。
 - 多人标注流程：数据结构与算法已就绪（`consistency_engine` 支持任意多标注者），缺的是第二个真人标注者。
 
@@ -283,8 +331,9 @@ evalhub/
 │       ├── engine_annotate.mbt    标注引擎（校验 + 质检标记）
 │       ├── engine_analyze.mbt     分析引擎（统计 + 一致性 + 雷达图）
 │       ├── engine_data.mbt        数据引擎（RLHF 导出）
-│       ├── moon.pkg               ← JS 导出配置（link.js.exports）
-│       └── *_wbtest.mbt           白盒单测（60 个用例）
+│       ├── engine_wasm_abi.mbt    WASM 跨边界适配层（码点缓冲 ABI）
+│       ├── moon.pkg               ← JS / wasm-gc 双目标导出配置
+│       └── *_wbtest.mbt           白盒单测（75 个用例）
 ├── backend/                  # Node 网关
 │   ├── engine.js                  加载 MoonBit 编译产物
 │   ├── glm.js                     GLM 客户端（密钥只从本地配置读 + 请求节流）
@@ -299,10 +348,11 @@ evalhub/
 ├── tools/
 │   ├── build_dataset.mjs     真实数据管道（跑四引擎 → 写 data/out/）
 │   ├── capture_screenshots.mjs  用本机 Edge 无头 + CDP 自动生成界面截图
-│   └── engine_smoke.mjs      Node import MoonBit 引擎的跨语言冒烟测试
+│   ├── engine_smoke.mjs      Node import MoonBit 引擎的跨语言冒烟测试
+│   └── wasm_smoke.mjs        WASM 与 JS 两形态逐字符比对（64 项）
 ├── data/                     真实数据快照 + 引擎产物（可复现）
 ├── docs/
-│   ├── 踩坑记录.md           27 条真实报错与解法（面试弹药）
+│   ├── 踩坑记录.md           30 条真实报错与解法（面试弹药）
 │   └── screenshots/          界面截图（由脚本自动生成）
 ├── verify.bat                Windows 一键验收
 ├── LICENSE                   MIT

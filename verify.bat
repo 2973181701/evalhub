@@ -24,29 +24,33 @@ echo    Project dir : %ROOT%
 echo ==================================================
 echo.
 
-echo [1/8] moon version
+echo [1/10] moon version
 cd /d "%ROOT%\core"
 call moon version
 echo.
 
-echo [2/8] moon check        (type check, expect 0 errors)
+echo [2/10] moon check        (type check, expect 0 errors)
 call moon check
 echo.
 
-echo [3/8] moon test         (unit tests, expect 60 passed / 0 failed)
+echo [3/10] moon test         (unit tests, expect 75 passed / 0 failed)
 call moon test
 echo.
 
-echo [4/8] moon run cmd/main (four engines self-check)
+echo [4/10] moon run cmd/main (four engines self-check)
 call moon run cmd/main
 echo.
 
-echo [5/8] moon build --target js
+echo [5/10] moon build --target js       (ESM output for Node)
 call moon build --target js
 echo.
 
+echo [6/10] moon build --target wasm-gc  (self-contained .wasm, 0 imports)
+call moon build --target wasm-gc
+echo.
+
 cd /d "%ROOT%"
-echo [6/8] node tools/engine_smoke.mjs   (Node imports the MoonBit engine)
+echo [7/10] node tools/engine_smoke.mjs   (Node imports the MoonBit engine)
 if exist "tools\engine_smoke.mjs" (
   call node tools\engine_smoke.mjs
 ) else (
@@ -54,7 +58,15 @@ if exist "tools\engine_smoke.mjs" (
 )
 echo.
 
-echo [7/8] node tools/build_dataset.mjs  (real data pipeline -^> data/out/)
+echo [8/10] node tools/wasm_smoke.mjs     (wasm-gc vs js, expect 64 passed / 0 failed)
+if exist "tools\wasm_smoke.mjs" (
+  call node tools\wasm_smoke.mjs
+) else (
+  echo [SKIP] tools\wasm_smoke.mjs not found.
+)
+echo.
+
+echo [9/10] node tools/build_dataset.mjs  (real data pipeline -^> data/out/)
 if exist "tools\build_dataset.mjs" (
   call node tools\build_dataset.mjs
 ) else (
@@ -62,7 +74,7 @@ if exist "tools\build_dataset.mjs" (
 )
 echo.
 
-echo [8/8] frontend production build
+echo [10/10] frontend production build
 cd /d "%ROOT%\frontend"
 if exist "node_modules" (
   call npx vite build
@@ -73,9 +85,10 @@ cd /d "%ROOT%"
 echo.
 
 echo ==================================================
-echo    DONE.  Expect 8 sections above.
+echo    DONE.  Expect 10 sections above.
 echo    Pass = no line starting with "Error:" and
-echo           moon test reports "failed: 0".
+echo           moon test reports "failed: 0"
+echo           wasm_smoke reports "0 失败".
 echo.
 echo    To run the full stack manually:
 echo      1) cd backend  ^&^& npm install ^&^& node server.js
