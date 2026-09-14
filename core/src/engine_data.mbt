@@ -36,9 +36,7 @@
 ///|
 /// 对外入口：JSON 字符串进，JSON 字符串出。
 pub fn export_rlhf(input : String) -> String {
-  let j = try @json.parse(input) catch {
-    _ => return error_json("invalid_json")
-  }
+  let j = @json.parse(input) catch { _ => return error_json("invalid_json") }
   let format = {
     let f = get_str(j, "format")
     if f == "openai" {
@@ -111,7 +109,7 @@ fn dpo_item(
   task_type : String,
   prompt : String,
   chosen : String,
-  rejected : String
+  rejected : String,
 ) -> Json {
   let m : Map[String, Json] = Map([], capacity=8)
   m["id"] = Json::string(id)

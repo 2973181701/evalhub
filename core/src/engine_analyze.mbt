@@ -27,9 +27,7 @@
 ///   "max_spread":   [ { "id":"R04", "task_type":"逻辑推理", "spread":3.5 } ]
 /// }
 pub fn analyze_engine(input : String) -> String {
-  let j = try @json.parse(input) catch {
-    _ => return error_json("invalid_json")
-  }
+  let j = @json.parse(input) catch { _ => return error_json("invalid_json") }
   let scores = get_arr(j, "scores")
   let keys = dim_keys()
   let labels = dim_labels()
@@ -84,12 +82,7 @@ pub fn analyze_engine(input : String) -> String {
       }
       total_sum = total_sum + total
       let task_type = get_str(s, "task_type")
-      stats.push({
-        id: get_str(s, "id"),
-        task_type,
-        total,
-        spread: hi - lo,
-      })
+      stats.push({ id: get_str(s, "id"), task_type, total, spread: hi - lo, })
       // 分题型聚合（保持首次出现顺序，输出稳定）
       let idx = index_of_str(task_names, task_type)
       if idx < 0 {
@@ -122,7 +115,9 @@ pub fn analyze_engine(input : String) -> String {
     let tm : Map[String, Json] = Map([], capacity=4)
     tm["task_type"] = Json::string(task_names[t])
     tm["count"] = Json::number(Double::from_int(task_counts[t]))
-    tm["total"] = Json::number(round2(task_totals[t] / Double::from_int(task_counts[t])))
+    tm["total"] = Json::number(
+      round2(task_totals[t] / Double::from_int(task_counts[t])),
+    )
     by_task.push(Json::object(tm))
     t = t + 1
   }
@@ -131,7 +126,13 @@ pub fn analyze_engine(input : String) -> String {
   m["count"] = Json::number(cn)
   m["skipped"] = Json::number(Double::from_int(skipped))
   m["dimensions"] = Json::object(dimensions)
-  m["total"] = Json::number(if count == 0 { 0.0 } else { round2(total_sum / cn) })
+  m["total"] = Json::number(
+    if count == 0 {
+      0.0
+    } else {
+      round2(total_sum / cn)
+    },
+  )
   m["radar"] = Json::array(radar)
   m["by_task_type"] = Json::array(by_task)
   m["lowest_total"] = Json::array(pick_samples(stats, "total", false))
@@ -162,7 +163,11 @@ fn radar_point(key : String, label : String, value : Double) -> Json {
 /// 挑出最需要注意的样本（最多 5 条）：
 ///   field = "total"  → 总分最低（最该人工复核）
 ///   field = "spread" → 五维极差最大（引擎自己都拿不准，规则冲突的信号）
-fn pick_samples(stats : Array[SampleStat], field : String, desc : Bool) -> Array[Json] {
+fn pick_samples(
+  stats : Array[SampleStat],
+  field : String,
+  desc : Bool,
+) -> Array[Json] {
   let picked : Array[Int] = []
   let limit = if stats.length() < 5 { stats.length() } else { 5 }
   let mut round = 0
@@ -230,9 +235,7 @@ fn pick_samples(stats : Array[SampleStat], field : String, desc : Bool) -> Array
 ///   全票一致率 = 全体标注者完全一致的条目占比
 ///   Fleiss' κ   = (P̄ − P_e) / (1 − P_e)，扣除「瞎猜也会撞上」的偶然一致
 pub fn consistency_engine(input : String) -> String {
-  let j = try @json.parse(input) catch {
-    _ => return error_json("invalid_json")
-  }
+  let j = @json.parse(input) catch { _ => return error_json("invalid_json") }
   let records = get_arr(j, "records")
   let annotators : Array[String] = []
   let item_ids : Array[String] = []
@@ -389,10 +392,13 @@ fn kappa_of(
   annotator_count : Int,
   sum_pi : Double,
   cat_totals : Array[Double],
-  cat_count : Int
+  cat_count : Int,
 ) -> (Double?, String) {
   if annotator_count < 2 {
-    return (None, "只有 1 位标注者，一致性无从谈起（κ 需 ≥2 人）")
+    return (
+      None,
+      "只有 1 位标注者，一致性无从谈起（κ 需 ≥2 人）",
+    )
   }
   if complete_n < 2 {
     return (
@@ -413,7 +419,10 @@ fn kappa_of(
     k = k + 1
   }
   if 1.0 - p_e <= 0.0000001 {
-    return (None, "所有标注者对所有样本的选择都落在同一类别，κ 无定义（P_e = 1）")
+    return (
+      None,
+      "所有标注者对所有样本的选择都落在同一类别，κ 无定义（P_e = 1）",
+    )
   }
   (Some((p_bar - p_e) / (1.0 - p_e)), "")
 }

@@ -27,7 +27,10 @@ test "RLHF 导出：choice=A → chosen=answer_A，rejected=answer_B" {
   let item = data[0]
   assert_eq(t_str(item, "prompt"), "中国的首都是哪个城市？")
   assert_eq(t_str(item, "chosen"), "北京")
-  assert_eq(t_str(item, "rejected"), "中国的首都是北京，北京是政治文化中心。")
+  assert_eq(
+    t_str(item, "rejected"),
+    "中国的首都是北京，北京是政治文化中心。",
+  )
   assert_eq(t_str(item, "id"), "K01")
 }
 

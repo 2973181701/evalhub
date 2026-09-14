@@ -7,7 +7,7 @@
 
 ///|
 fn t_parse(s : String) -> Json {
-  try @json.parse(s) catch {
+  @json.parse(s) catch {
     _ => Json::null()
   }
 }
@@ -64,10 +64,7 @@ fn t_arr(j : Json, key : String) -> Array[Json] {
 fn t_arr_has_str(arr : Array[Json], target : String) -> Bool {
   for item in arr {
     match item {
-      Json::String(s) =>
-        if s == target {
-          return true
-        }
+      Json::String(s) => if s == target { return true }
       _ => ()
     }
   }
@@ -109,7 +106,14 @@ test "标注校验：合法标注 → valid=true 且无错误" {
 
 ///|
 test "标注校验：非法 choice → valid=false 且报出 choice 错误" {
-  let c = validate_annotation("K01", "北京", "上海", "C", "选 C 因为……", Some(4.0))
+  let c = validate_annotation(
+    "K01",
+    "北京",
+    "上海",
+    "C",
+    "选 C 因为……",
+    Some(4.0),
+  )
   assert_false(c.valid)
   assert_true(c.errors.length() == 1)
   assert_true(contains_str(c.errors[0], "choice"))
@@ -117,40 +121,93 @@ test "标注校验：非法 choice → valid=false 且报出 choice 错误" {
 
 ///|
 test "标注校验：空 choice → valid=false" {
-  let c = validate_annotation("K01", "北京", "上海", "   ", "选 A 因为简洁", Some(4.0))
+  let c = validate_annotation(
+    "K01",
+    "北京",
+    "上海",
+    "   ",
+    "选 A 因为简洁",
+    Some(4.0),
+  )
   assert_false(c.valid)
 }
 
 ///|
 test "标注校验：reason 为空 → valid=false（禁止只选不写）" {
-  let c = validate_annotation("K01", "北京", "上海", "A", "   \n ", Some(4.0))
+  let c = validate_annotation(
+    "K01",
+    "北京",
+    "上海",
+    "A",
+    "   \n ",
+    Some(4.0),
+  )
   assert_false(c.valid)
   assert_true(contains_str(c.errors[0], "reason"))
 }
 
 ///|
 test "标注校验：confidence 越界 0 与 6 → valid=false" {
-  assert_false(validate_annotation("K01", "北京", "上海", "A", "选 A 因为简洁", Some(0.0)).valid)
-  assert_false(validate_annotation("K01", "北京", "上海", "A", "选 A 因为简洁", Some(6.0)).valid)
+  assert_false(
+    validate_annotation(
+      "K01",
+      "北京",
+      "上海",
+      "A",
+      "选 A 因为简洁",
+      Some(0.0),
+    ).valid,
+  )
+  assert_false(
+    validate_annotation(
+      "K01",
+      "北京",
+      "上海",
+      "A",
+      "选 A 因为简洁",
+      Some(6.0),
+    ).valid,
+  )
 }
 
 ///|
 test "标注校验：confidence 非整数 3.5 → valid=false" {
-  let c = validate_annotation("K01", "北京", "上海", "A", "选 A 因为简洁", Some(3.5))
+  let c = validate_annotation(
+    "K01",
+    "北京",
+    "上海",
+    "A",
+    "选 A 因为简洁",
+    Some(3.5),
+  )
   assert_false(c.valid)
   assert_true(contains_str(c.errors[0], "整数"))
 }
 
 ///|
 test "标注校验：confidence 缺失 → valid=false" {
-  let c = validate_annotation("K01", "北京", "上海", "A", "选 A 因为简洁", None)
+  let c = validate_annotation(
+    "K01",
+    "北京",
+    "上海",
+    "A",
+    "选 A 因为简洁",
+    None,
+  )
   assert_false(c.valid)
   assert_true(contains_str(c.errors[0], "confidence"))
 }
 
 ///|
 test "标注校验：answer_A 为空 → valid=false（没有比较对象）" {
-  let c = validate_annotation("K01", "", "上海", "A", "选 A 因为简洁", Some(4.0))
+  let c = validate_annotation(
+    "K01",
+    "",
+    "上海",
+    "A",
+    "选 A 因为简洁",
+    Some(4.0),
+  )
   assert_false(c.valid)
   assert_true(contains_str(c.errors[0], "answer_A"))
 }
@@ -161,7 +218,12 @@ test "标注校验：answer_A 为空 → valid=false（没有比较对象）" {
 ///|
 test "质检标记：confidence ≤ 2 → low_confidence（仍 valid）" {
   let c = validate_annotation(
-    "R04", "答案是 B", "推导后结论是 A", "平手", "平手：两者均未正确解出，瑕疵相当。", Some(2.0),
+    "R04",
+    "答案是 B",
+    "推导后结论是 A",
+    "平手",
+    "平手：两者均未正确解出，瑕疵相当。",
+    Some(2.0),
   )
   assert_true(c.valid)
   assert_true(c.flags.length() >= 1)
@@ -171,7 +233,12 @@ test "质检标记：confidence ≤ 2 → low_confidence（仍 valid）" {
 ///|
 test "质检标记：平手 → tie_needs_review（规范要求慎用）" {
   let c = validate_annotation(
-    "S02", "5G推动物联网发展", "5G推动物联网发展。", "tie", "平手：两回答文本完全相同。", Some(5.0),
+    "S02",
+    "5G推动物联网发展",
+    "5G推动物联网发展。",
+    "tie",
+    "平手：两回答文本完全相同。",
+    Some(5.0),
   )
   assert_true(c.valid)
   assert_true(t_arr_has_str(t_flags_json(c), "tie_needs_review"))
@@ -179,7 +246,14 @@ test "质检标记：平手 → tie_needs_review（规范要求慎用）" {
 
 ///|
 test "质检标记：理由过短 → reason_too_short" {
-  let c = validate_annotation("K01", "北京", "上海", "A", "A 更好", Some(4.0))
+  let c = validate_annotation(
+    "K01",
+    "北京",
+    "上海",
+    "A",
+    "A 更好",
+    Some(4.0),
+  )
   assert_true(c.valid)
   assert_true(t_arr_has_str(t_flags_json(c), "reason_too_short"))
 }
@@ -187,7 +261,12 @@ test "质检标记：理由过短 → reason_too_short" {
 ///|
 test "质检标记：A 与 B 文本完全相同 → identical_answers" {
   let c = validate_annotation(
-    "S02", "5G推动物联网发展。", "5G推动物联网发展。", "A", "选 A：两者文本相同但更简洁。", Some(4.0),
+    "S02",
+    "5G推动物联网发展。",
+    "5G推动物联网发展。",
+    "A",
+    "选 A：两者文本相同但更简洁。",
+    Some(4.0),
   )
   assert_true(c.valid)
   assert_true(t_arr_has_str(t_flags_json(c), "identical_answers"))

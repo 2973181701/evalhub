@@ -6,12 +6,11 @@ name = "evalhub/core"
 
 version = "0.1.0"
 
-
 repository = ""
 
 license = "MIT"
 
-keywords = ["llm", "evaluation", "annotation", "rlhf", "moonbit"]
+keywords = [ "llm", "evaluation", "annotation", "rlhf", "moonbit" ]
 
 preferred_target = "js"
 

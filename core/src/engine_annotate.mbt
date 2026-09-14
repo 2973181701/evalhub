@@ -41,9 +41,7 @@ pub struct AnnotationCheck {
 ///|
 /// 对外入口：JSON 字符串进，JSON 字符串出。
 pub fn annotate_engine(input : String) -> String {
-  let j = try @json.parse(input) catch {
-    _ => return error_json("invalid_json")
-  }
+  let j = @json.parse(input) catch { _ => return error_json("invalid_json") }
   let c = validate_annotation(
     get_str(j, "id"),
     get_str(j, "answer_A"),
@@ -63,7 +61,7 @@ pub fn validate_annotation(
   answer_b : String,
   choice_raw : String,
   reason : String,
-  confidence : Double?
+  confidence : Double?,
 ) -> AnnotationCheck {
   let errors : Array[String] = []
   let flags : Array[String] = []
@@ -76,12 +74,18 @@ pub fn validate_annotation(
   // ② choice
   let choice = normalize_choice(choice_raw)
   if choice == "" {
-    errors.push("choice 必须是 A / B / 平手（收到：" + shorten(choice_raw) + "）")
+    errors.push(
+      "choice 必须是 A / B / 平手（收到：" +
+      shorten(choice_raw) +
+      "）",
+    )
   }
 
   // ③ reason
   if blank(reason) {
-    errors.push("reason 不能为空（标注规范要求「禁止只选不写」）")
+    errors.push(
+      "reason 不能为空（标注规范要求「禁止只选不写」）",
+    )
   } else if no_ws_len(reason) < 8 {
     flags.push("reason_too_short")
   }
@@ -91,9 +95,13 @@ pub fn validate_annotation(
   match confidence {
     Some(v) =>
       if v < 1.0 || v > 5.0 {
-        errors.push("confidence 必须在 1–5 之间（收到 " + v.to_string() + "）")
+        errors.push(
+          "confidence 必须在 1–5 之间（收到 " + v.to_string() + "）",
+        )
       } else if v != Double::from_int(v.to_int()) {
-        errors.push("confidence 必须是整数（收到 " + v.to_string() + "）")
+        errors.push(
+          "confidence 必须是整数（收到 " + v.to_string() + "）",
+        )
       } else {
         conf = v.to_int()
       }
@@ -119,13 +127,7 @@ pub fn validate_annotation(
     flags.push("identical_answers")
   }
 
-  {
-    valid: errors.length() == 0,
-    errors,
-    flags,
-    choice,
-    confidence: conf,
-  }
+  { valid: errors.length() == 0, errors, flags, choice, confidence: conf, }
 }
 
 ///|

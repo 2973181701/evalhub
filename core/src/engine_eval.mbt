@@ -8,6 +8,7 @@
 /// 维度：准确性 / 完整性 / 逻辑性 / 安全性 / 表达质量，各 0–5，total 为均分。
 /// 输入不是合法 JSON 时输出 { "error": "..." }，绝不向宿主抛错。
 
+///|
 /// 五维评分结果（typed 纯函数用；JSON 边界由 eval_engine 负责）
 pub struct ScoreResult {
   accuracy : Double
@@ -21,9 +22,7 @@ pub struct ScoreResult {
 ///|
 /// 对外入口：JSON 字符串进，JSON 字符串出。Node 后端只 import 这一个函数。
 pub fn eval_engine(input : String) -> String {
-  let j = try @json.parse(input) catch {
-    _ => return error_json("invalid_json")
-  }
+  let j = @json.parse(input) catch { _ => return error_json("invalid_json") }
   let prompt = get_str(j, "prompt")
   let answer = get_str(j, "answer")
   let reference = get_str(j, "reference")
@@ -37,7 +36,7 @@ pub fn eval_score(
   prompt : String,
   answer : String,
   reference : String,
-  task_type : String
+  task_type : String,
 ) -> ScoreResult {
   let a = score_accuracy(answer, reference, prompt, task_type)
   let c = score_completeness(answer, reference, prompt, task_type)
@@ -67,7 +66,7 @@ pub fn score_accuracy(
   answer : String,
   reference : String,
   prompt : String,
-  task_type : String
+  task_type : String,
 ) -> Double {
   if task_type == "创意写作" {
     return 3.0
@@ -108,7 +107,7 @@ pub fn score_accuracy(
 fn atom_hit_ratio(
   atoms : Array[Array[Int]],
   ans_codes : Array[Int],
-  ans_bg : Array[Int]
+  ans_bg : Array[Int],
 ) -> Double {
   let mut hits = 0.0
   for atom in atoms {
@@ -132,7 +131,7 @@ pub fn score_completeness(
   answer : String,
   reference : String,
   prompt : String,
-  task_type : String
+  task_type : String,
 ) -> Double {
   if task_type == "创意写作" {
     return 3.0
@@ -168,7 +167,7 @@ pub fn score_completeness(
 fn atom_coverage_score(
   atoms : Array[Array[Int]],
   ans_codes : Array[Int],
-  ans_bg : Array[Int]
+  ans_bg : Array[Int],
 ) -> Double {
   let mut credit = 0.0
   for atom in atoms {
@@ -193,7 +192,8 @@ pub fn score_logic(answer : String, task_type : String) -> Double {
   } else if task_type == "代码生成" {
     2.0 + 0.5 * Double::from_int(count_distinct(answer, code_markers()))
   } else {
-    let base = 3.0 + 0.4 * Double::from_int(count_distinct(answer, connective_markers()))
+    let base = 3.0 +
+      0.4 * Double::from_int(count_distinct(answer, connective_markers()))
     if answer.length() < 10 {
       2.0
     } else {
@@ -442,7 +442,7 @@ fn is_word_code(c : Int) -> Bool {
 /// 按 keep 谓词切出极大连续段
 fn split_codes_by(
   codes : Array[Int],
-  keep : (Int) -> Bool
+  keep : (Int) -> Bool,
 ) -> Array[Array[Int]] {
   let out : Array[Array[Int]] = []
   let mut cur : Array[Int] = []
@@ -608,24 +608,24 @@ fn length_band(task_type : String) -> (Int, Int) {
 ///|
 fn logic_markers() -> Array[String] {
   [
-    "因为", "所以", "因此", "由于", "首先", "其次", "然后", "最后", "从而",
-    "综上", "前提", "假设", "推出", "得出",
+    "因为", "所以", "因此", "由于", "首先", "其次", "然后", "最后",
+    "从而", "综上", "前提", "假设", "推出", "得出",
   ]
 }
 
 ///|
 fn code_markers() -> Array[String] {
   [
-    "def ", "function", "return", "if", "else", "for", "while", "class",
-    "import", "=>", "```",
+    "def ", "function", "return", "if", "else", "for", "while", "class", "import",
+    "=>", "```",
   ]
 }
 
 ///|
 fn connective_markers() -> Array[String] {
   [
-    "因为", "所以", "因此", "但是", "然而", "首先", "其次", "最后", "综上",
-    "总体", "整体",
+    "因为", "所以", "因此", "但是", "然而", "首先", "其次", "最后",
+    "综上", "总体", "整体",
   ]
 }
 

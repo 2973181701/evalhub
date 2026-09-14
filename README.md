@@ -165,6 +165,7 @@ node tools/wasm_smoke.mjs    # 用真实数据把两形态输出逐字符比对 
 ```bash
 cd core
 moon check                          # 类型检查
+moon fmt --check                    # 格式检查（本项目代码符合 MoonBit 官方格式）
 moon test                           # 单元测试 → Total tests: 75, passed: 75, failed: 0
 moon build --target js              # 编译成 ESM JavaScript，供 Node 直接 import
 moon build --target wasm-gc         # 可选：编译成自包含 .wasm（171 KB，0 依赖）
@@ -374,7 +375,7 @@ evalhub/
 │   └── api_verify.mjs        12 个 HTTP 接口全量验收（43 项，自动起后端）
 ├── data/                     真实数据快照 + 引擎产物（可复现）
 ├── docs/
-│   ├── 踩坑记录.md           32 条真实报错与解法（1120 行，面试弹药）
+│   ├── 踩坑记录.md           33 条真实报错与解法（1171 行，面试弹药）
 │   └── screenshots/          界面截图（由脚本自动生成）
 ├── verify.bat                Windows 一键验收
 ├── LICENSE                   MIT
