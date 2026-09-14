@@ -32,6 +32,42 @@ const EDGE_CANDIDATES = [
 const PORT = 9222;
 const BASE = process.env.EVALHUB_FRONTEND || 'http://127.0.0.1:5173';
 
+/**
+ * ⚠️ 本脚本为了截出「标注提交后的引擎校验反馈」，会**真的调一次 POST /api/annotate**，
+ * 那会写入运行期标注文件（data/out/annotations_submitted.json）。
+ *
+ * 这会永久改变项目状态：报告页的「平均置信度」会从 4.4 漂到 4.35、
+ * 「运行期新增」从 0 变 1——**截图脚本污染了被截图的对象**，截图就和文档对不上了。
+ *
+ * 两道防线：
+ *   1. 采集顺序：报告页（05/06/07）必须在提交标注**之前**截，否则截到的是被污染的状态
+ *   2. 快照 / 还原：跑之前记下文件原样，跑完（含异常退出）写回
+ */
+const SUBMITTED = path.resolve(HERE, '..', 'data', 'out', 'annotations_submitted.json');
+let submittedExisted = false;
+let submittedSnapshot = null;
+
+function snapshotSubmitted() {
+  submittedExisted = fs.existsSync(SUBMITTED);
+  if (submittedExisted) submittedSnapshot = fs.readFileSync(SUBMITTED, 'utf8');
+}
+
+function restoreSubmitted() {
+  try {
+    if (submittedExisted) {
+      fs.writeFileSync(SUBMITTED, submittedSnapshot, 'utf8');
+      console.log('  运行期标注文件已还原到截图之前的状态。');
+    } else if (fs.existsSync(SUBMITTED)) {
+      fs.unlinkSync(SUBMITTED);
+      console.log('  运行期标注文件已删除（截图之前本来不存在）。');
+    }
+    console.log('  注意：后端是懒加载缓存，正在运行的后端仍持有旧数据；');
+    console.log('        要让页面反映还原后的状态，请重启后端（本脚本不负责管理后端进程）。');
+  } catch (e) {
+    console.log('  ⚠ 还原运行期标注文件失败：' + e.message + '（请手动检查 ' + SUBMITTED + '）');
+  }
+}
+
 function findBrowser() {
   for (const p of EDGE_CANDIDATES) {
     if (fs.existsSync(p)) return p;
@@ -165,6 +201,7 @@ async function main() {
     mobile: false,
   });
 
+  snapshotSubmitted();
   const shots = [];
 
   // ① 评测看板：选一题 → 点「对已有真实回答打分」
@@ -188,7 +225,26 @@ async function main() {
   await sleep(9000); // 等大模型返回（实测约 3s，留足余量）
   shots.push(['02-eval-glm-live.png', await cdp.screenshot(path.join(OUT_DIR, '02-eval-glm-live.png'))]);
 
-  // ③ 标注界面：填一条完整标注
+  // ③ 报告页：雷达图 + 均分表 + 一致性
+  //    ⚠️ 必须排在「提交标注」之前——提交会写入运行期标注，把平均置信度从 4.4 改成 4.35
+  await cdp.goto(`${BASE}/#report`, 2600);
+  shots.push(['05-report.png', await cdp.screenshot(path.join(OUT_DIR, '05-report.png'))]);
+
+  // ④ 报告页下半部分：滚动到一致性 + 导出区
+  await cdp.evaluate('window.scrollTo(0, document.body.scrollHeight)');
+  await sleep(900);
+  shots.push(['06-report-consistency.png', await cdp.screenshot(path.join(OUT_DIR, '06-report-consistency.png'))]);
+
+  // ⑤ 报告页：点导出，展示 RLHF 结果
+  await cdp.evaluate(`(() => {
+    const b = [...document.querySelectorAll('button')].find((x) => x.textContent.trim() === '导出');
+    if (b) b.click();
+    return Boolean(b);
+  })()`);
+  await sleep(1500);
+  shots.push(['07-report-export.png', await cdp.screenshot(path.join(OUT_DIR, '07-report-export.png'))]);
+
+  // ⑥ 标注界面：填一条完整标注（放在最后，因为它会写运行期状态）
   await cdp.goto(`${BASE}/#annotate`);
   await cdp.evaluate(`(() => {
     const pick = (t) => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === t);
@@ -208,7 +264,7 @@ async function main() {
   await sleep(600);
   shots.push(['03-annotate.png', await cdp.screenshot(path.join(OUT_DIR, '03-annotate.png'))]);
 
-  // ④ 标注界面：提交，展示引擎校验反馈
+  // ⑦ 标注界面：提交，展示引擎校验反馈
   await cdp.evaluate(`(() => {
     const b = [...document.querySelectorAll('button')].find((x) => x.textContent.includes('提交标注'));
     if (b) b.click();
@@ -217,25 +273,8 @@ async function main() {
   await sleep(1800);
   shots.push(['04-annotate-validated.png', await cdp.screenshot(path.join(OUT_DIR, '04-annotate-validated.png'))]);
 
-  // ⑤ 报告页：雷达图 + 均分表 + 一致性
-  await cdp.goto(`${BASE}/#report`, 2600);
-  shots.push(['05-report.png', await cdp.screenshot(path.join(OUT_DIR, '05-report.png'))]);
-
-  // ⑥ 报告页下半部分：滚动到一致性 + 导出区
-  await cdp.evaluate('window.scrollTo(0, document.body.scrollHeight)');
-  await sleep(900);
-  shots.push(['06-report-consistency.png', await cdp.screenshot(path.join(OUT_DIR, '06-report-consistency.png'))]);
-
-  // ⑦ 报告页：点导出，展示 RLHF 结果
-  await cdp.evaluate(`(() => {
-    const b = [...document.querySelectorAll('button')].find((x) => x.textContent.trim() === '导出');
-    if (b) b.click();
-    return Boolean(b);
-  })()`);
-  await sleep(1500);
-  shots.push(['07-report-export.png', await cdp.screenshot(path.join(OUT_DIR, '07-report-export.png'))]);
-
   proc.kill();
+  restoreSubmitted();
   console.log('\n截图已写入 ' + path.relative(path.resolve(HERE, '..'), OUT_DIR));
   for (const [name, size] of shots) console.log(`  ${name.padEnd(30)} ${(size / 1024).toFixed(1)} KB`);
 }

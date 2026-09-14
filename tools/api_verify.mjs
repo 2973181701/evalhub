@@ -12,12 +12,45 @@
  */
 
 import { spawn } from 'node:child_process';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
 const BASE = process.env.EVALHUB_BASE || 'http://127.0.0.1:3000';
+
+/**
+ * ⚠️ 本脚本会调 POST /api/annotate，那会**真的写入**运行期标注文件
+ * （data/out/annotations_submitted.json）。
+ *
+ * 如果不还原，跑一次验证就会永久改变项目状态：报告页的「平均置信度」等数字会漂移，
+ * 文档里的 4.4 会变成 4.35——**验证脚本污染了被验证的对象，验证就不再可复现**。
+ *
+ * 所以这里做快照 / 还原：跑之前记下文件原样，跑完（含失败退出）写回。
+ */
+const SUBMITTED = path.join(ROOT, 'data', 'out', 'annotations_submitted.json');
+let submittedExisted = false;
+let submittedSnapshot = null;
+
+function snapshotSubmitted() {
+  submittedExisted = fs.existsSync(SUBMITTED);
+  if (submittedExisted) submittedSnapshot = fs.readFileSync(SUBMITTED, 'utf8');
+}
+
+function restoreSubmitted() {
+  try {
+    if (submittedExisted) {
+      fs.writeFileSync(SUBMITTED, submittedSnapshot, 'utf8');
+      console.log('  运行期标注文件已还原到跑之前的状态。');
+    } else if (fs.existsSync(SUBMITTED)) {
+      fs.unlinkSync(SUBMITTED);
+      console.log('  运行期标注文件已删除（跑之前本来不存在）。');
+    }
+  } catch (e) {
+    console.log('  ⚠ 还原运行期标注文件失败：' + e.message + '（请手动检查 ' + SUBMITTED + '）');
+  }
+}
 
 let pass = 0;
 let fail = 0;
@@ -106,6 +139,7 @@ console.log('EvalHub · 后端接口全量验收');
 console.log('═'.repeat(78));
 console.log(`  目标：${BASE}`);
 console.log('');
+snapshotSubmitted();
 await ensureBackend();
 console.log('');
 
@@ -313,6 +347,7 @@ if (fail > 0) {
   for (const f of failures) console.log('  · ' + f);
   console.log('\n结论：后端**未全部跑通**，不能进入下一阶段。');
   stopBackend();
+  restoreSubmitted();
   process.exit(1);
 }
 console.log('');
@@ -320,3 +355,4 @@ console.log('结论：12 个接口全部返回预期结构，含一次真实大�
 console.log('═'.repeat(78));
 console.log('');
 stopBackend();
+restoreSubmitted();

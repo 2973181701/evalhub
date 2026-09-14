@@ -100,9 +100,35 @@ expect('标注者数', solo.annotators.length, 1);
 expect('Fleiss κ 为 null', solo.fleiss_kappa, null);
 expect('给出了原因说明', solo.kappa_note.length > 0, true);
 
+/* ---------- 运行期状态检查（不算失败，但要提醒） ---------- */
+/*
+ * 上面的数字全部基于「种子数据」（data/annotations.json 的 20 条）。
+ * 但后端会把「运行期提交的标注」合并进来，按 id 去重、提交覆盖种子。
+ * 一旦运行期文件存在，界面显示的数字就会和文档不一致（实测：置信度 4.4 → 4.35）。
+ *
+ * 这不是 bug，但会让人以为文档错了。所以这里显式提醒。
+ * 见 docs/踩坑记录.md 坑 32。
+ */
+const SUBMITTED = path.join(OUT, 'annotations_submitted.json');
+let runtimeDirty = false;
+if (fs.existsSync(SUBMITTED)) {
+  runtimeDirty = true;
+  try {
+    const sub = read(SUBMITTED);
+    console.log('\n【运行期状态】⚠ 检测到运行期提交的标注');
+    console.log(`  文件：data/out/annotations_submitted.json（${sub.length} 条：${sub.map((x) => x.id).join(', ')}）`);
+    console.log('  影响：界面显示的数字会与本文档不一致（提交会覆盖同 id 的种子标注）。');
+    console.log('  说明：本文档引用的数字全部基于种子数据 data/annotations.json 的 20 条。');
+    console.log('  处理：删掉该文件并重启后端，界面即回到种子状态。');
+    console.log('        （tools/api_verify.mjs 与 capture_screenshots.mjs 已加自动还原，不应再残留）');
+  } catch (e) {
+    console.log('\n【运行期状态】⚠ 运行期标注文件存在但无法解析：' + e.message);
+  }
+}
+
 /* ---------- 汇总 ---------- */
 console.log('\n' + '═'.repeat(78));
-console.log(`结果：${pass} 通过 / ${fail} 失败`);
+console.log(`结果：${pass} 通过 / ${fail} 失败${runtimeDirty ? '（另有 1 项运行期状态提醒）' : ''}`);
 if (fail > 0) {
   console.log('\n不一致明细（文档必须改成产物值，或改产物）：');
   for (const b of bad) console.log('  · ' + b);
@@ -110,5 +136,6 @@ if (fail > 0) {
 }
 console.log('');
 console.log('结论：文档引用的所有关键数字与可复现产物**完全一致**。');
+if (!runtimeDirty) console.log('      运行期状态干净（无残留的测试提交标注）。');
 console.log('═'.repeat(78));
 console.log('');
