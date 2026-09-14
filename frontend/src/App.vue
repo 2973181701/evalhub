@@ -16,6 +16,17 @@ const current = computed(() => TABS.find((t) => t.key === active.value).comp);
 const health = ref(null);
 const healthError = ref('');
 
+/** 用 hash 做极简路由：三个页面可深链（#eval / #annotate / #report），刷新不丢当前页 */
+function syncFromHash() {
+  const key = (location.hash || '').replace('#', '');
+  if (TABS.some((t) => t.key === key)) active.value = key;
+}
+
+function switchTab(key) {
+  active.value = key;
+  if (location.hash !== `#${key}`) location.hash = key;
+}
+
 async function loadHealth() {
   try {
     health.value = await api.health();
@@ -26,7 +37,11 @@ async function loadHealth() {
   }
 }
 
-onMounted(loadHealth);
+onMounted(() => {
+  syncFromHash();
+  window.addEventListener('hashchange', syncFromHash);
+  loadHealth();
+});
 </script>
 
 <template>
@@ -42,7 +57,7 @@ onMounted(loadHealth);
         :key="t.key"
         class="tab"
         :class="{ active: active === t.key }"
-        @click="active = t.key"
+        @click="switchTab(t.key)"
       >
         {{ t.label }}
       </button>

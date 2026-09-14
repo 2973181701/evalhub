@@ -167,7 +167,37 @@ node tools/build_dataset.mjs      # 需要先完成第 1 步
 
 ---
 
-## 五、HTTP 接口一览
+## 五、界面截图
+
+> 截图由 `node tools/capture_screenshots.mjs` 用本机 Edge 无头模式 + CDP 自动生成，**截的是真实交互状态**（真实大模型调用、真实引擎校验反馈）。
+
+### 评测看板 · 现调 GLM 生成回答并打分
+
+![评测看板](docs/screenshots/02-eval-glm-live.png)
+
+左侧是 20 条真实评测题；右侧五维分数条由 MoonBit 评测引擎算出。图上这次是**真实调用 glm-4-flash**（2174ms）后打出的 4.5 分。
+
+### 标注界面 · 提交后引擎校验反馈
+
+![标注界面](docs/screenshots/04-annotate-validated.png)
+
+A/B 双栏对比（A 版 2 字、B 版 581 字），选偏好 → 填理由 → 选置信度 → 提交。底部绿色条是 **MoonBit 标注引擎返回的校验结果**：`校验通过，已入库 / 归一化结果：choice = A, confidence = 4`。
+
+### 报告页 · 五维雷达图与一致性分析
+
+![报告页](docs/screenshots/05-report.png)
+
+雷达图是**手写 SVG**（零 ECharts 依赖），数据来自分析引擎对 20 条真实数据的统计。
+
+![一致性分析](docs/screenshots/06-report-consistency.png)
+
+一致性面板：人工 vs 规则引擎一致率 20%、κ = −0.2982；以及「只有 1 位标注者 → κ = null + 原因」的诚实呈现。
+
+其余截图：`01-eval-board.png`（对已有回答打分）、`03-annotate.png`（标注填写中）、`07-report-export.png`（RLHF 导出结果）。
+
+---
+
+## 六、HTTP 接口一览
 
 | 方法 | 路径 | 作用 | 需要大模型 |
 |---|---|---|---|
@@ -188,7 +218,7 @@ node tools/build_dataset.mjs      # 需要先完成第 1 步
 
 ---
 
-## 六、真实数字（可复现）
+## 七、真实数字（可复现）
 
 全部来自 20 条真实评测题 + 20 条 GLM 真实回答 + 20 组真实 A/B 偏好对 + 20 条真实人工标注。
 
@@ -207,7 +237,7 @@ node tools/build_dataset.mjs      # 需要先完成第 1 步
 
 ---
 
-## 七、已知边界与设计取舍（诚实声明）
+## 八、已知边界与设计取舍（诚实声明）
 
 这个项目刻意把「能算什么、不能算什么」讲清楚，而不是把数字包装得好看。
 
@@ -242,7 +272,7 @@ node tools/build_dataset.mjs      # 需要先完成第 1 步
 
 ---
 
-## 八、目录结构
+## 九、目录结构
 
 ```
 evalhub/
@@ -268,9 +298,12 @@ evalhub/
 │       └── views/                 EvalBoard / AnnotateView / ReportView
 ├── tools/
 │   ├── build_dataset.mjs     真实数据管道（跑四引擎 → 写 data/out/）
+│   ├── capture_screenshots.mjs  用本机 Edge 无头 + CDP 自动生成界面截图
 │   └── engine_smoke.mjs      Node import MoonBit 引擎的跨语言冒烟测试
 ├── data/                     真实数据快照 + 引擎产物（可复现）
-├── docs/踩坑记录.md          27 条真实报错与解法（面试弹药）
+├── docs/
+│   ├── 踩坑记录.md           27 条真实报错与解法（面试弹药）
+│   └── screenshots/          界面截图（由脚本自动生成）
 ├── verify.bat                Windows 一键验收
 ├── LICENSE                   MIT
 └── README.md
@@ -278,7 +311,7 @@ evalhub/
 
 ---
 
-## 九、数据来源声明
+## 十、数据来源声明
 
 `data/` 下的数据来自本仓库作者的另外两个真实项目，**原文件只读、未做任何修改**：
 
@@ -293,7 +326,7 @@ evalhub/
 
 ---
 
-## 十、借鉴声明
+## 十一、借鉴声明
 
 架构设计借鉴以下开源项目，**代码为原创实现**：
 
@@ -305,6 +338,6 @@ evalhub/
 
 ---
 
-## 十一、License
+## 十二、License
 
 [MIT](./LICENSE)

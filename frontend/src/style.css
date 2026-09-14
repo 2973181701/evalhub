@@ -193,8 +193,10 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-fam
 
 .dim-row { display: grid; grid-template-columns: 74px 1fr 46px; align-items: center; gap: 10px; margin-bottom: 9px; }
 .dim-name { font-size: 12.5px; color: var(--text-2); }
-.dim-track { height: 8px; background: #eef2f7; border-radius: 999px; overflow: hidden; }
-.dim-fill { height: 100%; border-radius: 999px; transition: width 0.5s cubic-bezier(0.2, 0.8, 0.2, 1); }
+/* display:block 是必须的：dim-track/dim-fill 用的是 <span>，
+   行内元素会忽略 width/height，进度条就渲染不出来 */
+.dim-track { display: block; height: 8px; background: #eef2f7; border-radius: 999px; overflow: hidden; }
+.dim-fill { display: block; height: 100%; border-radius: 999px; transition: width 0.5s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .dim-val { font-size: 12.5px; font-family: var(--mono); text-align: right; font-weight: 600; }
 
 .total-box {
