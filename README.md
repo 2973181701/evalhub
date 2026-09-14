@@ -375,7 +375,7 @@ evalhub/
 │   └── api_verify.mjs        12 个 HTTP 接口全量验收（43 项，自动起后端）
 ├── data/                     真实数据快照 + 引擎产物（可复现）
 ├── docs/
-│   ├── 踩坑记录.md           34 条真实报错与解法（1219 行，面试弹药）
+│   ├── 踩坑记录.md           35 条真实报错与解法（1294 行，面试弹药）
 │   └── screenshots/          界面截图（由脚本自动生成）
 ├── verify.bat                Windows 一键验收
 ├── LICENSE                   MIT
