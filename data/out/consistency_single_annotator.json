@@ -1,0 +1,13 @@
+{
+  "annotators": [
+    "human"
+  ],
+  "items_rated": 20,
+  "items_complete": 0,
+  "skipped": 0,
+  "pairwise_agreement": 0,
+  "unanimous_rate": 1,
+  "fleiss_kappa": null,
+  "kappa_note": "只有 1 位标注者，一致性无从谈起（κ 需 ≥2 人）",
+  "disputed_items": []
+}

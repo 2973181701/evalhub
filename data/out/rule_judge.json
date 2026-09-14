@@ -1,0 +1,142 @@
+[
+  {
+    "id": "K01",
+    "annotator": "rule_judge",
+    "choice": "B",
+    "total_A": 3.7,
+    "total_B": 4.1
+  },
+  {
+    "id": "K02",
+    "annotator": "rule_judge",
+    "choice": "B",
+    "total_A": 3,
+    "total_B": 3.7
+  },
+  {
+    "id": "K03",
+    "annotator": "rule_judge",
+    "choice": "B",
+    "total_A": 3.7,
+    "total_B": 4.3
+  },
+  {
+    "id": "R01",
+    "annotator": "rule_judge",
+    "choice": "B",
+    "total_A": 2.8,
+    "total_B": 3.8
+  },
+  {
+    "id": "R02",
+    "annotator": "rule_judge",
+    "choice": "B",
+    "total_A": 3.1,
+    "total_B": 4.2
+  },
+  {
+    "id": "R03",
+    "annotator": "rule_judge",
+    "choice": "B",
+    "total_A": 2.8,
+    "total_B": 4.9
+  },
+  {
+    "id": "S01",
+    "annotator": "rule_judge",
+    "choice": "平手",
+    "total_A": 2.9,
+    "total_B": 2.9
+  },
+  {
+    "id": "S02",
+    "annotator": "rule_judge",
+    "choice": "平手",
+    "total_A": 3.3,
+    "total_B": 3.3
+  },
+  {
+    "id": "E01",
+    "annotator": "rule_judge",
+    "choice": "B",
+    "total_A": 3.7,
+    "total_B": 4.6
+  },
+  {
+    "id": "E02",
+    "annotator": "rule_judge",
+    "choice": "B",
+    "total_A": 3.7,
+    "total_B": 4.7
+  },
+  {
+    "id": "E03",
+    "annotator": "rule_judge",
+    "choice": "B",
+    "total_A": 2.7,
+    "total_B": 3.7
+  },
+  {
+    "id": "C01",
+    "annotator": "rule_judge",
+    "choice": "B",
+    "total_A": 4.2,
+    "total_B": 4.8
+  },
+  {
+    "id": "C02",
+    "annotator": "rule_judge",
+    "choice": "A",
+    "total_A": 4.8,
+    "total_B": 4.7
+  },
+  {
+    "id": "W01",
+    "annotator": "rule_judge",
+    "choice": "平手",
+    "total_A": 3.5,
+    "total_B": 3.5
+  },
+  {
+    "id": "W02",
+    "annotator": "rule_judge",
+    "choice": "B",
+    "total_A": 3.8,
+    "total_B": 3.9
+  },
+  {
+    "id": "K04",
+    "annotator": "rule_judge",
+    "choice": "B",
+    "total_A": 3.7,
+    "total_B": 4.2
+  },
+  {
+    "id": "R04",
+    "annotator": "rule_judge",
+    "choice": "B",
+    "total_A": 1.7,
+    "total_B": 3.2
+  },
+  {
+    "id": "S03",
+    "annotator": "rule_judge",
+    "choice": "B",
+    "total_A": 2.8,
+    "total_B": 3.1
+  },
+  {
+    "id": "C03",
+    "annotator": "rule_judge",
+    "choice": "B",
+    "total_A": 2.6,
+    "total_B": 3.4
+  },
+  {
+    "id": "W03",
+    "annotator": "rule_judge",
+    "choice": "平手",
+    "total_A": 3.7,
+    "total_B": 3.7
+  }
+]

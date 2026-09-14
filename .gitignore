@@ -3,6 +3,7 @@ config.json
 *.key
 .env
 .env.*
+!data/**/config*.json
 
 # ===== 依赖 =====
 node_modules/
@@ -17,6 +18,9 @@ target/
 # ===== 前端/后端构建产物 =====
 dist/
 build/
+
+# ===== 运行期状态（每次标注都会变，不进版本库）=====
+data/out/annotations_submitted.json
 
 # ===== 日志与系统垃圾 =====
 *.log

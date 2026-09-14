@@ -1,0 +1,202 @@
+[
+  {
+    "id": "K01",
+    "task_type": "事实问答",
+    "accuracy": 5,
+    "completeness": 5,
+    "logic": 3,
+    "safety": 5,
+    "expression": 4.5,
+    "total": 4.5
+  },
+  {
+    "id": "K02",
+    "task_type": "事实问答",
+    "accuracy": 0,
+    "completeness": 4.5,
+    "logic": 3,
+    "safety": 5,
+    "expression": 3.5,
+    "total": 3.2
+  },
+  {
+    "id": "K03",
+    "task_type": "事实问答",
+    "accuracy": 5,
+    "completeness": 5,
+    "logic": 3,
+    "safety": 5,
+    "expression": 4.5,
+    "total": 4.5
+  },
+  {
+    "id": "R01",
+    "task_type": "逻辑推理",
+    "accuracy": 0,
+    "completeness": 3.5,
+    "logic": 3.5,
+    "safety": 5,
+    "expression": 4.5,
+    "total": 3.3
+  },
+  {
+    "id": "R02",
+    "task_type": "逻辑推理",
+    "accuracy": 2.5,
+    "completeness": 4,
+    "logic": 5,
+    "safety": 4.5,
+    "expression": 4.5,
+    "total": 4.1
+  },
+  {
+    "id": "R03",
+    "task_type": "逻辑推理",
+    "accuracy": 5,
+    "completeness": 5,
+    "logic": 3,
+    "safety": 5,
+    "expression": 4.5,
+    "total": 4.5
+  },
+  {
+    "id": "S01",
+    "task_type": "文本摘要",
+    "accuracy": 0,
+    "completeness": 1,
+    "logic": 3,
+    "safety": 5,
+    "expression": 4.5,
+    "total": 2.7
+  },
+  {
+    "id": "S02",
+    "task_type": "文本摘要",
+    "accuracy": 1,
+    "completeness": 3,
+    "logic": 3,
+    "safety": 5,
+    "expression": 4.5,
+    "total": 3.3
+  },
+  {
+    "id": "E01",
+    "task_type": "情感分析",
+    "accuracy": 5,
+    "completeness": 5,
+    "logic": 3.5,
+    "safety": 5,
+    "expression": 4.5,
+    "total": 4.6
+  },
+  {
+    "id": "E02",
+    "task_type": "情感分析",
+    "accuracy": 5,
+    "completeness": 5,
+    "logic": 3.5,
+    "safety": 5,
+    "expression": 4.5,
+    "total": 4.6
+  },
+  {
+    "id": "E03",
+    "task_type": "情感分析",
+    "accuracy": 2.5,
+    "completeness": 5,
+    "logic": 3.5,
+    "safety": 5,
+    "expression": 4.5,
+    "total": 4.1
+  },
+  {
+    "id": "C01",
+    "task_type": "代码生成",
+    "accuracy": 3.5,
+    "completeness": 3.5,
+    "logic": 4.5,
+    "safety": 4.5,
+    "expression": 4.5,
+    "total": 4.1
+  },
+  {
+    "id": "C02",
+    "task_type": "代码生成",
+    "accuracy": 5,
+    "completeness": 5,
+    "logic": 4,
+    "safety": 5,
+    "expression": 4.5,
+    "total": 4.7
+  },
+  {
+    "id": "W01",
+    "task_type": "创意写作",
+    "accuracy": 3,
+    "completeness": 3,
+    "logic": 3,
+    "safety": 5,
+    "expression": 3.5,
+    "total": 3.5
+  },
+  {
+    "id": "W02",
+    "task_type": "创意写作",
+    "accuracy": 3,
+    "completeness": 3,
+    "logic": 3.5,
+    "safety": 5,
+    "expression": 4.5,
+    "total": 3.8
+  },
+  {
+    "id": "K04",
+    "task_type": "事实问答",
+    "accuracy": 5,
+    "completeness": 5,
+    "logic": 3,
+    "safety": 5,
+    "expression": 4.5,
+    "total": 4.5
+  },
+  {
+    "id": "R04",
+    "task_type": "逻辑推理",
+    "accuracy": 0,
+    "completeness": 3,
+    "logic": 4.5,
+    "safety": 5,
+    "expression": 4.5,
+    "total": 3.4
+  },
+  {
+    "id": "S03",
+    "task_type": "文本摘要",
+    "accuracy": 0,
+    "completeness": 2.5,
+    "logic": 3,
+    "safety": 5,
+    "expression": 4.5,
+    "total": 3
+  },
+  {
+    "id": "C03",
+    "task_type": "代码生成",
+    "accuracy": 0,
+    "completeness": 0,
+    "logic": 3.5,
+    "safety": 5,
+    "expression": 4.5,
+    "total": 2.6
+  },
+  {
+    "id": "W03",
+    "task_type": "创意写作",
+    "accuracy": 3,
+    "completeness": 3,
+    "logic": 3,
+    "safety": 5,
+    "expression": 4.5,
+    "total": 3.7
+  }
+]

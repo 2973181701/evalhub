@@ -1,0 +1,187 @@
+[
+  {
+    "id": "K01",
+    "valid": true,
+    "errors": [],
+    "flags": [],
+    "choice": "A",
+    "confidence": 5,
+    "task_type": "事实问答"
+  },
+  {
+    "id": "K02",
+    "valid": true,
+    "errors": [],
+    "flags": [],
+    "choice": "A",
+    "confidence": 4,
+    "task_type": "事实问答"
+  },
+  {
+    "id": "K03",
+    "valid": true,
+    "errors": [],
+    "flags": [],
+    "choice": "A",
+    "confidence": 5,
+    "task_type": "事实问答"
+  },
+  {
+    "id": "R01",
+    "valid": true,
+    "errors": [],
+    "flags": [],
+    "choice": "A",
+    "confidence": 5,
+    "task_type": "逻辑推理"
+  },
+  {
+    "id": "R02",
+    "valid": true,
+    "errors": [],
+    "flags": [],
+    "choice": "B",
+    "confidence": 5,
+    "task_type": "逻辑推理"
+  },
+  {
+    "id": "R03",
+    "valid": true,
+    "errors": [],
+    "flags": [],
+    "choice": "B",
+    "confidence": 5,
+    "task_type": "逻辑推理"
+  },
+  {
+    "id": "S01",
+    "valid": true,
+    "errors": [],
+    "flags": [],
+    "choice": "A",
+    "confidence": 4,
+    "task_type": "文本摘要"
+  },
+  {
+    "id": "S02",
+    "valid": true,
+    "errors": [],
+    "flags": [
+      "tie_needs_review",
+      "identical_answers"
+    ],
+    "choice": "平手",
+    "confidence": 5,
+    "task_type": "文本摘要"
+  },
+  {
+    "id": "E01",
+    "valid": true,
+    "errors": [],
+    "flags": [],
+    "choice": "A",
+    "confidence": 5,
+    "task_type": "情感分析"
+  },
+  {
+    "id": "E02",
+    "valid": true,
+    "errors": [],
+    "flags": [],
+    "choice": "A",
+    "confidence": 5,
+    "task_type": "情感分析"
+  },
+  {
+    "id": "E03",
+    "valid": true,
+    "errors": [],
+    "flags": [],
+    "choice": "A",
+    "confidence": 4,
+    "task_type": "情感分析"
+  },
+  {
+    "id": "C01",
+    "valid": true,
+    "errors": [],
+    "flags": [],
+    "choice": "A",
+    "confidence": 4,
+    "task_type": "代码生成"
+  },
+  {
+    "id": "C02",
+    "valid": true,
+    "errors": [],
+    "flags": [],
+    "choice": "A",
+    "confidence": 4,
+    "task_type": "代码生成"
+  },
+  {
+    "id": "W01",
+    "valid": true,
+    "errors": [],
+    "flags": [],
+    "choice": "A",
+    "confidence": 5,
+    "task_type": "创意写作"
+  },
+  {
+    "id": "W02",
+    "valid": true,
+    "errors": [],
+    "flags": [],
+    "choice": "A",
+    "confidence": 5,
+    "task_type": "创意写作"
+  },
+  {
+    "id": "K04",
+    "valid": true,
+    "errors": [],
+    "flags": [],
+    "choice": "A",
+    "confidence": 4,
+    "task_type": "事实问答"
+  },
+  {
+    "id": "R04",
+    "valid": true,
+    "errors": [],
+    "flags": [
+      "tie_needs_review"
+    ],
+    "choice": "平手",
+    "confidence": 3,
+    "task_type": "逻辑推理"
+  },
+  {
+    "id": "S03",
+    "valid": true,
+    "errors": [],
+    "flags": [],
+    "choice": "A",
+    "confidence": 4,
+    "task_type": "文本摘要"
+  },
+  {
+    "id": "C03",
+    "valid": true,
+    "errors": [],
+    "flags": [],
+    "choice": "A",
+    "confidence": 4,
+    "task_type": "代码生成"
+  },
+  {
+    "id": "W03",
+    "valid": true,
+    "errors": [],
+    "flags": [],
+    "choice": "A",
+    "confidence": 3,
+    "task_type": "创意写作"
+  }
+]

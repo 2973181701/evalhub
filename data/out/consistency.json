@@ -1,0 +1,31 @@
+{
+  "annotators": [
+    "human",
+    "rule_judge"
+  ],
+  "items_rated": 20,
+  "items_complete": 20,
+  "skipped": 0,
+  "pairwise_agreement": 0.2,
+  "unanimous_rate": 0.2,
+  "fleiss_kappa": -0.2982,
+  "kappa_note": "",
+  "disputed_items": [
+    "K01",
+    "K02",
+    "K03",
+    "R01",
+    "S01",
+    "E01",
+    "E02",
+    "E03",
+    "C01",
+    "W01",
+    "W02",
+    "K04",
+    "R04",
+    "S03",
+    "C03",
+    "W03"
+  ]
+}

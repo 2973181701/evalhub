@@ -1,0 +1,130 @@
+{
+  "count": 20,
+  "skipped": 0,
+  "dimensions": {
+    "accuracy": 2.68,
+    "completeness": 3.7,
+    "logic": 3.45,
+    "safety": 4.95,
+    "expression": 4.4
+  },
+  "total": 3.84,
+  "radar": [
+    {
+      "key": "accuracy",
+      "label": "准确性",
+      "value": 2.68,
+      "ratio": 0.54
+    },
+    {
+      "key": "completeness",
+      "label": "完整性",
+      "value": 3.7,
+      "ratio": 0.74
+    },
+    {
+      "key": "logic",
+      "label": "逻辑性",
+      "value": 3.45,
+      "ratio": 0.69
+    },
+    {
+      "key": "safety",
+      "label": "安全性",
+      "value": 4.95,
+      "ratio": 0.99
+    },
+    {
+      "key": "expression",
+      "label": "表达质量",
+      "value": 4.4,
+      "ratio": 0.88
+    }
+  ],
+  "by_task_type": [
+    {
+      "task_type": "事实问答",
+      "count": 4,
+      "total": 4.18
+    },
+    {
+      "task_type": "逻辑推理",
+      "count": 4,
+      "total": 3.83
+    },
+    {
+      "task_type": "文本摘要",
+      "count": 3,
+      "total": 3
+    },
+    {
+      "task_type": "情感分析",
+      "count": 3,
+      "total": 4.43
+    },
+    {
+      "task_type": "代码生成",
+      "count": 3,
+      "total": 3.8
+    },
+    {
+      "task_type": "创意写作",
+      "count": 3,
+      "total": 3.67
+    }
+  ],
+  "lowest_total": [
+    {
+      "id": "C03",
+      "task_type": "代码生成",
+      "total": 2.6
+    },
+    {
+      "id": "S01",
+      "task_type": "文本摘要",
+      "total": 2.7
+    },
+    {
+      "id": "S03",
+      "task_type": "文本摘要",
+      "total": 3
+    },
+    {
+      "id": "K02",
+      "task_type": "事实问答",
+      "total": 3.2
+    },
+    {
+      "id": "R01",
+      "task_type": "逻辑推理",
+      "total": 3.3
+    }
+  ],
+  "max_spread": [
+    {
+      "id": "K02",
+      "task_type": "事实问答",
+      "spread": 5
+    },
+    {
+      "id": "R01",
+      "task_type": "逻辑推理",
+      "spread": 5
+    },
+    {
+      "id": "S01",
+      "task_type": "文本摘要",
+      "spread": 5
+    },
+    {
+      "id": "R04",
+      "task_type": "逻辑推理",
+      "spread": 5
+    },
+    {
+      "id": "S03",
+      "task_type": "文本摘要",
+      "spread": 5
+    }
+  ]
+}

@@ -293,12 +293,56 @@ fn round2(x : Double) -> Double {
 
 ///|
 /// String → Unicode 码元数组（本引擎内部统一用码元数组做文本计算）
+///
+/// 注意：这里会先做「同形字符归一化」。真实模型输出大量使用 Unicode 变体——
+/// 「水的化学式是 H₂O」「CO₂」里的下标 ₂ 是 U+2082 而不是 ASCII '2'。
+/// 不做归一化的话，参考答案 "H2O" 会被判成完全没命中（实测踩到过这个坑）。
+/// 归一化只统一「同一个字符的不同写法」，不做任何语义猜测。
 fn codes_of(s : String) -> Array[Int] {
   let arr : Array[Int] = []
   for ch in s {
-    arr.push(ch.to_int())
+    arr.push(normalize_code(ch.to_int()))
   }
   arr
+}
+
+///|
+/// 同形字符归一化：下标/上标/全角数字 → ASCII 数字；全角括号 → 半角
+fn normalize_code(c : Int) -> Int {
+  if c >= 0x2080 && c <= 0x2089 {
+    return c - 0x2080 + 48
+  }
+  if c >= 0x2070 && c <= 0x2079 {
+    if c == 0x2070 {
+      return 48
+    }
+    return c - 0x2070 + 48
+  }
+  if c == 0x00B9 {
+    return 49
+  }
+  if c == 0x00B2 {
+    return 50
+  }
+  if c == 0x00B3 {
+    return 51
+  }
+  if c >= 0xFF10 && c <= 0xFF19 {
+    return c - 0xFF10 + 48
+  }
+  if c >= 0xFF21 && c <= 0xFF3A {
+    return c - 0xFF21 + 65
+  }
+  if c >= 0xFF41 && c <= 0xFF5A {
+    return c - 0xFF41 + 97
+  }
+  if c == 0xFF08 {
+    return 40
+  }
+  if c == 0xFF09 {
+    return 41
+  }
+  c
 }
 
 ///|
