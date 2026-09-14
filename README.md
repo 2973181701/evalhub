@@ -120,9 +120,9 @@ node tools/wasm_smoke.mjs    # 用真实数据把两形态输出逐字符比对 
 ```jsonc
 // analyze_engine：一批评分 → 均分 / 雷达图 / 分题型 / 需复核样本
 { "count": 20, "skipped": 0,
-  "dimensions": { "accuracy": 2.67, "completeness": 3.7, "logic": 3.45, "safety": 4.95, "expression": 4.4 },
+  "dimensions": { "accuracy": 2.68, "completeness": 3.7, "logic": 3.45, "safety": 4.95, "expression": 4.4 },
   "total": 3.84,
-  "radar": [ { "key": "accuracy", "label": "准确性", "value": 2.67, "ratio": 0.54 }, "..." ],
+  "radar": [ { "key": "accuracy", "label": "准确性", "value": 2.68, "ratio": 0.54 }, "..." ],
   "by_task_type": [ { "task_type": "事实问答", "count": 4, "total": 4.18 }, "..." ],
   "lowest_total": [ { "id": "C03", "task_type": "代码生成", "total": 2.6 }, "..." ],
   "max_spread":   [ { "id": "R01", "task_type": "逻辑推理", "spread": 5 }, "..." ] }
@@ -202,6 +202,20 @@ node tools/build_dataset.mjs      # 需要先完成第 1 步
 
 它会读取真实数据集，跑完四个引擎，把产物写进 `data/out/`（打分 / 报告 / 校验 / RLHF 数据集 / 一致性）。
 
+### 可选：一键验收全部指标
+
+```bash
+node tools/wasm_smoke.mjs      # WASM 与 JS 两形态逐字符比对 → 64 通过 / 0 失败
+node tools/audit_numbers.mjs   # 文档里的数字 vs 真实产物  → 31 通过 / 0 失败
+node tools/api_verify.mjs      # 12 个 HTTP 接口（自动拉起后端）→ 43 通过 / 0 失败
+```
+
+或直接双击 `verify.bat`，12 步一键跑完全部验收。
+
+> `audit_numbers.mjs` 存在的理由：文档里的数字一旦和可复现产物不一致，就是「造假」——
+> 哪怕只是手抄错一位。这个脚本把 README / 报告里引用的每个关键数字都拉去和
+> `data/out/` 对照。**它真的抓到过错**（见 `docs/踩坑记录.md` 坑 31）。
+
 ---
 
 ## 五、界面截图
@@ -264,7 +278,7 @@ A/B 双栏对比（A 版 2 字、B 版 581 字），选偏好 → 填理由 → 
 | MoonBit 引擎单元测试 | **75 / 75 通过** |
 | WASM 形态一致性比对 | **64 / 64 通过**（`wasm-gc` 与 `js` 输出逐字符一致） |
 | WASM 产物 | **171.4 KB**，12 个导出、**0 个导入**（自包含，无 JS glue） |
-| 五维均分 | 准确性 2.67 / 完整性 3.70 / 逻辑性 3.45 / 安全性 4.95 / 表达质量 4.40 |
+| 五维均分 | 准确性 2.68 / 完整性 3.70 / 逻辑性 3.45 / 安全性 4.95 / 表达质量 4.40 |
 | 总分均分 | **3.84 / 5** |
 | 分题型均分 | 事实问答 4.18 / 逻辑推理 3.83 / 文本摘要 3.00 / 情感分析 4.43 / 代码生成 3.80 / 创意写作 3.67 |
 | 标注校验通过率 | **20 / 20** |
@@ -273,6 +287,8 @@ A/B 双栏对比（A 版 2 字、B 版 581 字），选偏好 → 填理由 → 
 | RLHF 导出 | 20 条标注 → **18 条偏好样本**（丢弃 2 条平手） |
 | 人工 vs 规则引擎判优一致率 | 20.0%，Fleiss' κ = **−0.2982** |
 | 人工标注者之间的 κ | **null**（只有 1 位标注者，样本不足） |
+| 数字审计（文档 vs 产物） | **31 / 31 一致** |
+| 后端接口验收 | **43 / 43 通过**（12 个接口，含 1 次真实 GLM 调用） |
 
 ---
 
@@ -295,7 +311,7 @@ A/B 双栏对比（A 版 2 字、B 版 581 字），选偏好 → 填理由 → 
 
 因此准确性维度应读作**下界信号**，不是模型能力的定论。
 
-> 已经修掉的一类真 bug：模型输出常用 Unicode 下标（`H₂O` 的 `₂` 是 U+2082），早期版本判不中，修复后准确性均分从 2.42 升到 2.67、事实问答类从 3.68 升到 4.18。详见 `docs/踩坑记录.md` 坑 20。
+> 已经修掉的一类真 bug：模型输出常用 Unicode 下标（`H₂O` 的 `₂` 是 U+2082），早期版本判不中，修复后准确性均分从 2.42 升到 2.68、事实问答类从 3.68 升到 4.18。详见 `docs/踩坑记录.md` 坑 20。
 
 ### 3. 单人标注无法计算一致性
 
@@ -349,10 +365,12 @@ evalhub/
 │   ├── build_dataset.mjs     真实数据管道（跑四引擎 → 写 data/out/）
 │   ├── capture_screenshots.mjs  用本机 Edge 无头 + CDP 自动生成界面截图
 │   ├── engine_smoke.mjs      Node import MoonBit 引擎的跨语言冒烟测试
-│   └── wasm_smoke.mjs        WASM 与 JS 两形态逐字符比对（64 项）
+│   ├── wasm_smoke.mjs        WASM 与 JS 两形态逐字符比对（64 项）
+│   ├── audit_numbers.mjs     文档里的数字 vs 真实产物（31 项，防手抄错）
+│   └── api_verify.mjs        12 个 HTTP 接口全量验收（43 项，自动起后端）
 ├── data/                     真实数据快照 + 引擎产物（可复现）
 ├── docs/
-│   ├── 踩坑记录.md           30 条真实报错与解法（面试弹药）
+│   ├── 踩坑记录.md           31 条真实报错与解法（1039 行，面试弹药）
 │   └── screenshots/          界面截图（由脚本自动生成）
 ├── verify.bat                Windows 一键验收
 ├── LICENSE                   MIT

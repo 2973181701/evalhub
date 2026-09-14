@@ -24,57 +24,54 @@ echo    Project dir : %ROOT%
 echo ==================================================
 echo.
 
-echo [1/10] moon version
+echo [1/12] moon version
 cd /d "%ROOT%\core"
 call moon version
 echo.
 
-echo [2/10] moon check        (type check, expect 0 errors)
+echo [2/12] moon check        (type check, expect 0 errors)
 call moon check
 echo.
 
-echo [3/10] moon test         (unit tests, expect 75 passed / 0 failed)
+echo [3/12] moon test         (unit tests, expect 75 passed / 0 failed)
 call moon test
 echo.
 
-echo [4/10] moon run cmd/main (four engines self-check)
+echo [4/12] moon run cmd/main (four engines self-check)
 call moon run cmd/main
 echo.
 
-echo [5/10] moon build --target js       (ESM output for Node)
+echo [5/12] moon build --target js       (ESM output for Node)
 call moon build --target js
 echo.
 
-echo [6/10] moon build --target wasm-gc  (self-contained .wasm, 0 imports)
+echo [6/12] moon build --target wasm-gc  (self-contained .wasm, 0 imports)
 call moon build --target wasm-gc
 echo.
 
 cd /d "%ROOT%"
-echo [7/10] node tools/engine_smoke.mjs   (Node imports the MoonBit engine)
-if exist "tools\engine_smoke.mjs" (
-  call node tools\engine_smoke.mjs
-) else (
-  echo [SKIP] tools\engine_smoke.mjs not found.
-)
+echo [7/12] node tools/engine_smoke.mjs   (Node imports the MoonBit engine)
+if exist "tools\engine_smoke.mjs" ( call node tools\engine_smoke.mjs ) else ( echo [SKIP] not found. )
 echo.
 
-echo [8/10] node tools/wasm_smoke.mjs     (wasm-gc vs js, expect 64 passed / 0 failed)
-if exist "tools\wasm_smoke.mjs" (
-  call node tools\wasm_smoke.mjs
-) else (
-  echo [SKIP] tools\wasm_smoke.mjs not found.
-)
+echo [8/12] node tools/wasm_smoke.mjs     (wasm-gc vs js, expect 64 passed / 0 failed)
+if exist "tools\wasm_smoke.mjs" ( call node tools\wasm_smoke.mjs ) else ( echo [SKIP] not found. )
 echo.
 
-echo [9/10] node tools/build_dataset.mjs  (real data pipeline -^> data/out/)
-if exist "tools\build_dataset.mjs" (
-  call node tools\build_dataset.mjs
-) else (
-  echo [SKIP] tools\build_dataset.mjs not found.
-)
+echo [9/12] node tools/build_dataset.mjs  (real data pipeline -^> data/out/)
+if exist "tools\build_dataset.mjs" ( call node tools\build_dataset.mjs ) else ( echo [SKIP] not found. )
 echo.
 
-echo [10/10] frontend production build
+echo [10/12] node tools/audit_numbers.mjs  (doc numbers vs real artifacts, expect 31/0)
+if exist "tools\audit_numbers.mjs" ( call node tools\audit_numbers.mjs ) else ( echo [SKIP] not found. )
+echo.
+
+echo [11/12] node tools/api_verify.mjs      (12 HTTP endpoints, expect 43/0)
+echo         NOTE: this step auto-starts the backend on port 3000.
+if exist "tools\api_verify.mjs" ( call node tools\api_verify.mjs ) else ( echo [SKIP] not found. )
+echo.
+
+echo [12/12] frontend production build
 cd /d "%ROOT%\frontend"
 if exist "node_modules" (
   call npx vite build
@@ -85,10 +82,14 @@ cd /d "%ROOT%"
 echo.
 
 echo ==================================================
-echo    DONE.  Expect 10 sections above.
-echo    Pass = no line starting with "Error:" and
-echo           moon test reports "failed: 0"
-echo           wasm_smoke reports "0 失败".
+echo    DONE.  Expect 12 sections above.
+echo.
+echo    Pass criteria:
+echo      - no line starting with "Error:"
+echo      - moon test        : failed: 0        (expect 75 passed)
+echo      - wasm_smoke       : 0 failed         (expect 64 passed)
+echo      - audit_numbers    : 0 failed         (expect 31 passed)
+echo      - api_verify       : 0 failed         (expect 43 passed)
 echo.
 echo    To run the full stack manually:
 echo      1) cd backend  ^&^& npm install ^&^& node server.js
