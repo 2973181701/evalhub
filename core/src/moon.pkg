@@ -7,7 +7,14 @@ import {
 options(
   link: {
     "js": {
-      "exports": ["version", "eval_engine"],
+      "exports": [
+        "version",
+        "eval_engine",
+        "annotate_engine",
+        "analyze_engine",
+        "consistency_engine",
+        "export_rlhf",
+      ],
       "format": "esm",
     },
   },
