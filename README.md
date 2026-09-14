@@ -231,7 +231,7 @@ node tools/api_verify.mjs      # 12 个 HTTP 接口（自动拉起后端）→ 4
 
 ![评测看板](docs/screenshots/02-eval-glm-live.png)
 
-左侧是 20 条真实评测题；右侧五维分数条由 MoonBit 评测引擎算出。图上这次是**真实调用 glm-4-flash**（2174ms）后打出的 4.5 分。
+左侧是 20 条真实评测题；右侧五维分数条由 MoonBit 评测引擎算出。图上这次是**真实调用 glm-4-flash**（截图那次 2467 ms，每次调用不同）后打出的 4.5 分。
 
 ### 标注界面 · 提交后引擎校验反馈
 
@@ -375,7 +375,7 @@ evalhub/
 │   └── api_verify.mjs        12 个 HTTP 接口全量验收（43 项，自动起后端）
 ├── data/                     真实数据快照 + 引擎产物（可复现）
 ├── docs/
-│   ├── 踩坑记录.md           33 条真实报错与解法（1171 行，面试弹药）
+│   ├── 踩坑记录.md           34 条真实报错与解法（1219 行，面试弹药）
 │   └── screenshots/          界面截图（由脚本自动生成）
 ├── verify.bat                Windows 一键验收
 ├── LICENSE                   MIT
