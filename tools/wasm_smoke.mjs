@@ -398,6 +398,6 @@ if (fail > 0) {
 }
 console.log('');
 console.log('结论：五个引擎在 wasm-gc 形态下的输出与 js 形态**逐字节完全一致**。');
-console.log('      WASM 产物自包含（0 个导入），走 abi_* 码元缓冲 ABI 与宿主通信。');
+console.log('      WASM 产物自包含（0 个导入），走 abi_* 码点缓冲 ABI 与宿主通信。');
 console.log('═'.repeat(78));
 console.log('');
