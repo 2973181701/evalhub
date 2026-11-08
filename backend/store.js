@@ -1,82 +1,54 @@
 /**
- * EvalHub · 数据仓库层
+ * EvalHub · 业务层（仓储无关）
  *
- * 数据来源全部是用户已有的真实产物（只读快照，见 tools/build_dataset.mjs）：
- *   data/prompts.json     20 条评测题（含参考答案）
- *   data/answers.json     GLM 的真实回答
- *   data/pairs.json       20 组 A/B 偏好对
- *   data/annotations.json 20 条真实人工标注
+ * 本文件只做「业务计算 + 编排」，不碰文件系统、不碰数据库。
+ * 数据读写全部交给 repo/ 下的实现（JSON 或 PostgreSQL），二者接口一致：
  *
- * 本层额外维护「运行期新提交的标注」，落盘到 data/out/annotations_submitted.json，
- * 重启后不丢；与种子标注合并时，同一 id 以最新提交为准。
+ *   snapshot()        → { prompts, pairs, answers, seeds, submitted, byId }
+ *   annotations()     → 合并后的标注列表（同 id 以运行期提交覆盖种子）
+ *   saveAnnotation(r) → 持久化一条标注（异步）
+ *
+ * 之所以这样切：企业版要接 PostgreSQL / 多租户 / 审计，而「打分、判优、
+ * 一致性、导出」这些规则必须继续只由 MoonBit 引擎单点定义，不能因为换存储而分叉。
  */
 
-import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { score, validateAnnotation, analyze, consistency, exportRlhf } from './engine.js';
+import { createRepo, ROOT, DATA_DIR } from './repo/index.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-export const ROOT = path.resolve(HERE, '..');
-export const DATA_DIR = path.join(ROOT, 'data');
-const OUT_DIR = path.join(DATA_DIR, 'out');
-const SUBMITTED_FILE = path.join(OUT_DIR, 'annotations_submitted.json');
+export { ROOT, DATA_DIR };
+export const BACKEND_DIR = HERE;
 
-function readJson(p, fallback) {
-  try {
-    return JSON.parse(fs.readFileSync(p, 'utf8'));
-  } catch {
-    return fallback;
-  }
+/** 启动时完成仓储选择（PG 模式会在此处连库并载入数据集快照） */
+const repo = await createRepo();
+
+/** 当前仓储形态，供 /api/health 自证「到底连的是文件还是数据库」 */
+export function storageInfo() {
+  return repo.describe();
 }
 
-function ensureData() {
-  const missing = ['prompts.json', 'pairs.json', 'annotations.json'].filter(
-    (f) => !fs.existsSync(path.join(DATA_DIR, f)),
-  );
-  if (missing.length) {
-    throw new Error(
-      `缺少数据文件：${missing.join(', ')}。请先在 evalhub 根目录执行： node tools/build_dataset.mjs`,
-    );
-  }
+/** 供上层（评测队列）拿到仓储实例，避免把数据集定位逻辑写两遍 */
+export function repoRef() {
+  return repo;
 }
 
-let cache = null;
-
-/** 懒加载 + 缓存（数据文件不大，进程内只读一次） */
+/** 同步读取数据集快照（进程内缓存，GET 接口无需 await） */
 export function load() {
-  if (cache) return cache;
-  ensureData();
-  const prompts = readJson(path.join(DATA_DIR, 'prompts.json'), []);
-  const pairs = readJson(path.join(DATA_DIR, 'pairs.json'), []);
-  const answers = readJson(path.join(DATA_DIR, 'answers.json'), []);
-  const seeds = readJson(path.join(DATA_DIR, 'annotations.json'), []);
-  const submitted = readJson(SUBMITTED_FILE, []);
-  cache = {
-    prompts,
-    pairs,
-    answers,
-    seeds,
-    submitted,
-    byId: {
-      prompt: new Map(prompts.map((p) => [p.id, p])),
-      pair: new Map(pairs.map((p) => [p.id, p])),
-      answer: new Map(answers.map((a) => [a.id, a])),
-    },
-  };
-  return cache;
+  return repo.snapshot();
 }
 
 /** 合并后的标注集：同 id 以「运行期最新提交」覆盖种子数据 */
 export function annotations() {
-  const { seeds, submitted } = load();
-  const map = new Map(seeds.map((a) => [a.id, { ...a, source: 'seed' }]));
-  for (const a of submitted) map.set(a.id, { ...a, source: 'submitted' });
-  return [...map.values()];
+  return repo.annotations();
 }
 
-/** 提交一条标注：先过 MoonBit 标注引擎校验，不通过就拒收 */
-export function submitAnnotation(payload) {
+/**
+ * 提交一条标注：先过 MoonBit 标注引擎校验，不通过就拒收。
+ * 校验是纯计算（同步），落库是异步，因此本函数返回 Promise。
+ */
+export async function submitAnnotation(payload) {
   const pair = load().byId.pair.get(payload.id) ?? {};
   const check = validateAnnotation({
     id: payload.id,
@@ -97,17 +69,8 @@ export function submitAnnotation(payload) {
     confidence: check.confidence,
     annotated_at: new Date().toISOString(),
   };
-  const { submitted } = load();
-  const idx = submitted.findIndex((x) => x.id === record.id);
-  if (idx >= 0) submitted[idx] = record;
-  else submitted.push(record);
-  persistSubmitted(submitted);
+  await repo.saveAnnotation(record);
   return { accepted: true, check, record };
-}
-
-function persistSubmitted(list) {
-  fs.mkdirSync(OUT_DIR, { recursive: true });
-  fs.writeFileSync(SUBMITTED_FILE, JSON.stringify(list, null, 2), 'utf8');
 }
 
 /** 用评测引擎给 20 条真实回答打分（确定性，可随时重算） */
@@ -168,7 +131,7 @@ export function soloConsistency() {
 
 /** 汇总报告：数据集规模 + 五维统计 + 一致性 + 平手率 */
 export function fullReport() {
-  const { prompts, pairs, answers } = load();
+  const { prompts, pairs, answers, submitted } = load();
   const scores = scoresOfRealAnswers();
   const stats = analyze({ scores });
   const ann = annotations();
@@ -179,7 +142,7 @@ export function fullReport() {
       pairs: pairs.length,
       answers: answers.length,
       annotations: ann.length,
-      submitted: load().submitted.length,
+      submitted: submitted.length,
     },
     scores: stats,
     score_rows: scores,

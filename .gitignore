@@ -3,6 +3,7 @@ config.json
 *.key
 .env
 .env.*
+!.env.example
 !data/**/config*.json
 
 # ===== 依赖 =====

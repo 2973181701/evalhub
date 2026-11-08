@@ -1,0 +1,386 @@
+{
+  "version": "v3",
+  "prompt_version": "prefer-v3",
+  "ran_at": "2026-11-08T05:43:32.785Z",
+  "model": "glm-4-flash",
+  "n": 20,
+  "failed": 0,
+  "cached_hits": 19,
+  "kappa": {
+    "n": 20,
+    "po": 0.55,
+    "pe": 0.38,
+    "kappa": 0.2742
+  },
+  "kappa_ci95": {
+    "lo": 0.009,
+    "hi": 0.5614,
+    "iterations": 2000
+  },
+  "judge_distribution": {
+    "A": 8,
+    "B": 6,
+    "平手": 6
+  },
+  "human_distribution": {
+    "A": 16,
+    "B": 2,
+    "平手": 2
+  },
+  "length_bias": {
+    "n_b_longer": 19,
+    "judge_picked_b": 6,
+    "judge_rate": 31.6,
+    "human_picked_b": 2,
+    "human_rate": 10.5
+  },
+  "disagreements": [
+    {
+      "id": "K01",
+      "human": "A",
+      "judge": "平手",
+      "len_A": 2,
+      "len_B": 581,
+      "reason": "两者都正确回答了问题，但 B 提供了额外信息",
+      "constraint": "无约束"
+    },
+    {
+      "id": "K02",
+      "human": "A",
+      "judge": "平手",
+      "len_A": 6,
+      "len_B": 852,
+      "reason": "两者都正确，但详略不同",
+      "constraint": "无约束"
+    },
+    {
+      "id": "R01",
+      "human": "A",
+      "judge": "B",
+      "len_A": 4,
+      "len_B": 315,
+      "reason": "B 的回答更完整，解释了推理过程",
+      "constraint": "无约束"
+    },
+    {
+      "id": "S01",
+      "human": "A",
+      "judge": "B",
+      "len_A": 25,
+      "len_B": 37,
+      "reason": "B 涵盖更全面的信息",
+      "constraint": "无约束"
+    },
+    {
+      "id": "E02",
+      "human": "A",
+      "judge": "平手",
+      "len_A": 2,
+      "len_B": 277,
+      "reason": "两者都正确，表达方式不同",
+      "constraint": "判断情绪（正面/负面/中性）"
+    },
+    {
+      "id": "E03",
+      "human": "A",
+      "judge": "平手",
+      "len_A": 2,
+      "len_B": 258,
+      "reason": "两者同档，无法区分优劣",
+      "constraint": "判断情绪（正面/负面/中性）"
+    },
+    {
+      "id": "C01",
+      "human": "A",
+      "judge": "平手",
+      "len_A": 170,
+      "len_B": 1151,
+      "reason": "两者都正确实现了功能，但风格不同",
+      "constraint": "无约束"
+    },
+    {
+      "id": "R04",
+      "human": "平手",
+      "judge": "B",
+      "len_A": 1,
+      "len_B": 843,
+      "reason": "B推理过程完整，结论正确",
+      "constraint": "逻辑推理，判断谁说了真话"
+    },
+    {
+      "id": "S03",
+      "human": "A",
+      "judge": "B",
+      "len_A": 16,
+      "len_B": 55,
+      "reason": "B 更全面地概括了文本内容",
+      "constraint": "无约束"
+    }
+  ],
+  "rows": [
+    {
+      "id": "K01",
+      "task_type": "事实问答",
+      "len_A": 2,
+      "len_B": 581,
+      "human": "A",
+      "judge": "平手",
+      "agree": false,
+      "reason": "两者都正确回答了问题，但 B 提供了额外信息",
+      "constraint": "无约束",
+      "analysis": "B 提供了更多关于北京作为首都的详细信息，而 A 仅回答了问题",
+      "identical": false
+    },
+    {
+      "id": "K02",
+      "task_type": "事实问答",
+      "len_A": 6,
+      "len_B": 852,
+      "human": "A",
+      "judge": "平手",
+      "agree": false,
+      "reason": "两者都正确，但详略不同",
+      "constraint": "无约束",
+      "analysis": "A 简洁直接；B 详细解释了光合作用过程和重要性",
+      "identical": false
+    },
+    {
+      "id": "K03",
+      "task_type": "事实问答",
+      "len_A": 3,
+      "len_B": 749,
+      "human": "A",
+      "judge": "A",
+      "agree": true,
+      "reason": "简洁准确给出答案",
+      "constraint": "无约束",
+      "analysis": "A 直接给出答案，B 提供了额外信息但未改变答案本质",
+      "identical": false
+    },
+    {
+      "id": "R01",
+      "task_type": "逻辑推理",
+      "len_A": 4,
+      "len_B": 315,
+      "human": "A",
+      "judge": "B",
+      "agree": false,
+      "reason": "B 的回答更完整，解释了推理过程",
+      "constraint": "无约束",
+      "analysis": "B 分析了推理过程，A 直接给出结论",
+      "identical": false
+    },
+    {
+      "id": "R02",
+      "task_type": "逻辑推理",
+      "len_A": 10,
+      "len_B": 383,
+      "human": "B",
+      "judge": "B",
+      "agree": true,
+      "reason": "B 完整完成题目要求的两步",
+      "constraint": "有，要求先判断前提是否正确再回答",
+      "analysis": "A 未判断前提，直接给出结论；B 先判断前提，再给出结论",
+      "identical": false
+    },
+    {
+      "id": "R03",
+      "task_type": "逻辑推理",
+      "len_A": 8,
+      "len_B": 434,
+      "human": "B",
+      "judge": "B",
+      "agree": true,
+      "reason": "B 的推理和计算正确",
+      "constraint": "逻辑推理，求解白球的最大数量",
+      "analysis": "A 未正确计算白球数量；B 正确计算并解释了白球的最大数量",
+      "identical": false
+    },
+    {
+      "id": "S01",
+      "task_type": "文本摘要",
+      "len_A": 25,
+      "len_B": 37,
+      "human": "A",
+      "judge": "B",
+      "agree": false,
+      "reason": "B 涵盖更全面的信息",
+      "constraint": "无约束",
+      "analysis": "B 在相关性与完整度上优于 A，B 包含了原文中的所有关键信息，而 A 略去了部分细节。",
+      "identical": false
+    },
+    {
+      "id": "S02",
+      "task_type": "文本摘要",
+      "len_A": 19,
+      "len_B": 19,
+      "human": "平手",
+      "judge": "平手",
+      "agree": true,
+      "reason": "两方回答完全相同",
+      "constraint": "无",
+      "analysis": "文本归一化后完全一致，不存在可区分差异",
+      "identical": true
+    },
+    {
+      "id": "E01",
+      "task_type": "情感分析",
+      "len_A": 2,
+      "len_B": 170,
+      "human": "A",
+      "judge": "A",
+      "agree": true,
+      "reason": "简洁直接符合题目要求",
+      "constraint": "判断情绪（正面/负面/中性）",
+      "analysis": "A 直接给出结论；B 解释了判断理由，但未改变结论",
+      "identical": false
+    },
+    {
+      "id": "E02",
+      "task_type": "情感分析",
+      "len_A": 2,
+      "len_B": 277,
+      "human": "A",
+      "judge": "平手",
+      "agree": false,
+      "reason": "两者都正确，表达方式不同",
+      "constraint": "判断情绪（正面/负面/中性）",
+      "analysis": "A 直接给出结论；B 解释了情绪判断的理由",
+      "identical": false
+    },
+    {
+      "id": "E03",
+      "task_type": "情感分析",
+      "len_A": 2,
+      "len_B": 258,
+      "human": "A",
+      "judge": "平手",
+      "agree": false,
+      "reason": "两者同档，无法区分优劣",
+      "constraint": "判断情绪（正面/负面/中性）",
+      "analysis": "A 与 B 都准确判断为中性，B 提供了更详细的解释",
+      "identical": false
+    },
+    {
+      "id": "C01",
+      "task_type": "代码生成",
+      "len_A": 170,
+      "len_B": 1151,
+      "human": "A",
+      "judge": "平手",
+      "agree": false,
+      "reason": "两者都正确实现了功能，但风格不同",
+      "constraint": "无约束",
+      "analysis": "A 简洁直接，B 详细解释了每个步骤和优化",
+      "identical": false
+    },
+    {
+      "id": "C02",
+      "task_type": "代码生成",
+      "len_A": 92,
+      "len_B": 838,
+      "human": "A",
+      "judge": "A",
+      "agree": true,
+      "reason": "A 简洁且符合题目要求",
+      "constraint": "无约束",
+      "analysis": "A 简洁直接；B 详细解释了每一步，但冗余较多",
+      "identical": false
+    },
+    {
+      "id": "W01",
+      "task_type": "创意写作",
+      "len_A": 15,
+      "len_B": 20,
+      "human": "A",
+      "judge": "A",
+      "agree": true,
+      "reason": "A 更符合字数要求",
+      "constraint": "15字内、贴合奶茶店、有吸引力",
+      "analysis": "A 简洁有力，直接点明主题；B 信息量稍多，但超字数限制",
+      "identical": false
+    },
+    {
+      "id": "W02",
+      "task_type": "创意写作",
+      "len_A": 60,
+      "len_B": 144,
+      "human": "A",
+      "judge": "A",
+      "agree": true,
+      "reason": "A 更符合题目要求",
+      "constraint": "3句、有情节转折、主题是坚持",
+      "analysis": "A 有明显的情节转折，B 虽有转折但主题偏离了坚持",
+      "identical": false
+    },
+    {
+      "id": "K04",
+      "task_type": "事实问答",
+      "len_A": 2,
+      "len_B": 497,
+      "human": "A",
+      "judge": "A",
+      "agree": true,
+      "reason": "B 超出了题目要求",
+      "constraint": "无约束",
+      "analysis": "B 提供了额外信息，但题目只要求回答举办城市",
+      "identical": false
+    },
+    {
+      "id": "R04",
+      "task_type": "逻辑推理",
+      "len_A": 1,
+      "len_B": 843,
+      "human": "平手",
+      "judge": "B",
+      "agree": false,
+      "reason": "B推理过程完整，结论正确",
+      "constraint": "逻辑推理，判断谁说了真话",
+      "analysis": "A未给出明确结论，B详细分析了推理过程并得出正确结论",
+      "identical": false
+    },
+    {
+      "id": "S03",
+      "task_type": "文本摘要",
+      "len_A": 16,
+      "len_B": 55,
+      "human": "A",
+      "judge": "B",
+      "agree": false,
+      "reason": "B 更全面地概括了文本内容",
+      "constraint": "无约束",
+      "analysis": "B 提供了更详细的利弊分析，而 A 概括较为简略。",
+      "identical": false
+    },
+    {
+      "id": "C03",
+      "task_type": "代码生成",
+      "len_A": 55,
+      "len_B": 1523,
+      "human": "A",
+      "judge": "A",
+      "agree": true,
+      "reason": "简洁性更高，符合题目要求",
+      "constraint": "无约束",
+      "analysis": "A 简洁直接；B 详细解释了切片方法，并提供了其他方法作为参考",
+      "identical": false
+    },
+    {
+      "id": "W03",
+      "task_type": "创意写作",
+      "len_A": 32,
+      "len_B": 37,
+      "human": "A",
+      "judge": "A",
+      "agree": true,
+      "reason": "A 符合字数要求",
+      "constraint": "50字内、体现细心和爱学习",
+      "analysis": "A 简洁明了，符合字数要求；B 多一个字，超字数限制",
+      "identical": false
+    }
+  ],
+  "cache_stats": {
+    "entries": 101,
+    "file": "data\\out\\judge_cache.json"
+  }
+}

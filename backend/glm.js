@@ -90,32 +90,68 @@ export function chat(prompt, opts = {}) {
   if (!glmReady) {
     throw new Error('未配置 GLM api_key，无法调用大模型（请在 llm-eval-project/config.json 中填写）');
   }
+  const maxAttempts = Math.max(1, Number(process.env.GLM_MAX_ATTEMPTS || 3));
+
+  /**
+   * 只重试「值得重试」的失败：5xx / 429 / 网络抖动。
+   * 4xx（密钥错、参数错）重试只会浪费额度并把问题掩盖成超时，
+   * 必须立刻抛出，让调用方看到真实原因。
+   */
+  const retryable = (status, err) => {
+    if (err) return true; // fetch 抛错 = 网络层问题
+    return status >= 500 || status === 429;
+  };
+
   return schedule(async () => {
-    const res = await fetch(`${glmConfig.baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${glmConfig.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: glmConfig.model,
-        messages: [
-          { role: 'system', content: glmConfig.systemRole },
-          { role: 'user', content: prompt },
-        ],
-        temperature: opts.temperature ?? 0.7,
-        ...(opts.maxTokens ? { max_tokens: opts.maxTokens } : {}),
-      }),
-    });
-    if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      throw new Error(`GLM 调用失败 HTTP ${res.status}：${text.slice(0, 200)}`);
+    let lastErr;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      let res;
+      try {
+        res = await fetch(`${glmConfig.baseUrl}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${glmConfig.apiKey}`,
+          },
+          body: JSON.stringify({
+            model: glmConfig.model,
+            messages: [
+              // 允许单次调用覆盖 system 提示：Judge 需要独立的评分 rubric，
+              // 不能复用对话用的「你是一个智能助手」
+              { role: 'system', content: opts.systemRole || glmConfig.systemRole },
+              { role: 'user', content: prompt },
+            ],
+            temperature: opts.temperature ?? 0.7,
+            ...(opts.maxTokens ? { max_tokens: opts.maxTokens } : {}),
+          }),
+        });
+      } catch (e) {
+        lastErr = new Error(`GLM 网络错误：${e.message}`);
+        if (attempt < maxAttempts) {
+          await new Promise((r) => setTimeout(r, 800 * attempt));
+          continue;
+        }
+        throw lastErr;
+      }
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        lastErr = new Error(`GLM 调用失败 HTTP ${res.status}：${text.slice(0, 200)}`);
+        if (retryable(res.status) && attempt < maxAttempts) {
+          // 指数退避：1.6s、3.2s……避免把限流打成雪崩
+          await new Promise((r) => setTimeout(r, 800 * 2 ** (attempt - 1)));
+          continue;
+        }
+        throw lastErr;
+      }
+
+      const data = await res.json();
+      const answer = data?.choices?.[0]?.message?.content;
+      if (typeof answer !== 'string') {
+        throw new Error('GLM 返回结构异常，未取到 choices[0].message.content');
+      }
+      return answer;
     }
-    const data = await res.json();
-    const answer = data?.choices?.[0]?.message?.content;
-    if (typeof answer !== 'string') {
-      throw new Error('GLM 返回结构异常，未取到 choices[0].message.content');
-    }
-    return answer;
+    throw lastErr ?? new Error('GLM 调用失败（未知原因）');
   });
 }

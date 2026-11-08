@@ -7,11 +7,29 @@
  */
 import { onMounted, ref, computed } from 'vue';
 import { api } from '../api.js';
+import { friendlyError } from '../errors.js';
 import RadarChart from '../components/RadarChart.vue';
 
 const report = ref(null);
 const loading = ref(true);
 const error = ref('');
+
+// LLM-as-Judge：第三个「标注者」，用来验证规则判优到底靠不靠谱
+const judgeBusy = ref(false);
+const judge = ref(null);
+const judgeError = ref('');
+
+async function runJudge() {
+  judgeBusy.value = true;
+  judgeError.value = '';
+  try {
+    judge.value = await api.judgePreferences();
+  } catch (e) {
+    judgeError.value = friendlyError(e);
+  } finally {
+    judgeBusy.value = false;
+  }
+}
 
 const exportFormat = ref('dpo');
 const exporting = ref(false);
@@ -25,7 +43,7 @@ onMounted(async () => {
   try {
     report.value = await api.report();
   } catch (e) {
-    error.value = e.message;
+    error.value = friendlyError(e);
   } finally {
     loading.value = false;
   }
@@ -38,7 +56,7 @@ async function doExport() {
   try {
     exportResult.value = await api.exportRlhf(exportFormat.value);
   } catch (e) {
-    exportError.value = e.message;
+    exportError.value = friendlyError(e);
   } finally {
     exporting.value = false;
   }
@@ -308,6 +326,71 @@ function download() {
           <div class="card-note" style="margin: 10px 0 6px">导出内容预览（第 1 条）</div>
           <pre class="json">{{ exportResult.data.length ? JSON.stringify(exportResult.data[0], null, 2) : '（没有可导出的样本）' }}</pre>
         </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <span class="card-title">三方一致性 · 规则 vs Judge vs 人工</span>
+          <span class="card-note">Judge 每次调用都烧额度，结果有缓存</span>
+        </div>
+        <p class="muted" style="margin: 0 0 10px">
+          A/B 偏好判定由三个「评分者」分别给出：人工标注（金标准）、规则判优（引擎按分数比大小）、
+          LLM-as-Judge（模型按 rubric 判）。单看 Judge 分数没意义，必须先证明它和人对得上。
+        </p>
+        <div class="btn-row">
+          <button class="btn primary" :disabled="judgeBusy" @click="runJudge">
+            {{ judgeBusy ? 'Judge 判定中…（约 1 分钟）' : judge ? '重新判定' : '运行 Judge 一致性检查' }}
+          </button>
+          <span v-if="judge" class="muted">判定 {{ judge.count }} 条，失败 {{ judge.failed }} 条</span>
+        </div>
+
+        <div v-if="judgeError" class="alert bad" style="margin-top: 10px">{{ judgeError }}</div>
+
+        <template v-if="judge">
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px">
+            <thead>
+              <tr class="muted" style="text-align: left">
+                <th style="padding: 6px">对比</th>
+                <th>一致率</th>
+                <th>Cohen's κ</th>
+                <th>判定条数</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(v, k) in judge.kappa" :key="k">
+                <td class="mono" style="padding: 6px">{{ k }}</td>
+                <td class="mono">{{ (v.po * 100).toFixed(1) }}%</td>
+                <td class="mono" :style="{ color: v.kappa > 0.4 ? 'var(--good)' : v.kappa < 0 ? 'var(--bad)' : '' }">
+                  {{ v.kappa === null ? '-' : v.kappa }}
+                </td>
+                <td class="mono muted">{{ v.n }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="card-note" style="margin-top: 8px">
+            三方 Fleiss κ = {{ judge.consistency_three_way.fleiss_kappa }}，
+            三方全同率 {{ (judge.consistency_three_way.unanimous_rate * 100).toFixed(0) }}%，
+            分歧题 {{ judge.consistency_three_way.disputed_items.length }} 条
+          </div>
+          <details style="margin-top: 10px">
+            <summary class="muted" style="cursor: pointer">Judge 逐条判定与理由</summary>
+            <table style="width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 8px">
+              <thead>
+                <tr class="muted" style="text-align: left">
+                  <th style="padding: 4px">题号</th><th>判定</th><th>约束判断</th><th>理由</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="r in judge.rows" :key="r.id">
+                  <td class="mono" style="padding: 4px">{{ r.id }}</td>
+                  <td class="mono">{{ r.choice || '—' }}</td>
+                  <td class="muted">{{ r.constraint || '—' }}</td>
+                  <td class="muted">{{ r.error || r.reason || '—' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+        </template>
       </section>
     </template>
   </main>

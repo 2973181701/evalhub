@@ -1,0 +1,29 @@
+# EvalHub 本地开发依赖：PostgreSQL 16
+# 用法：
+#   docker compose -f docker-compose.dev.yml up -d
+#   psql "postgres://evalhub:evalhub@localhost:5433/evalhub" -f db/schema.sql
+#   DATABASE_URL=postgres://evalhub:evalhub@localhost:5433/evalhub node db/migrate.mjs
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: evalhub-pg
+    environment:
+      POSTGRES_USER: evalhub
+      POSTGRES_PASSWORD: evalhub
+      POSTGRES_DB: evalhub
+      # 中文排序与大小写：显式指定 locale，避免不同机器行为不一致
+      LANG: C.UTF-8
+    ports:
+      # 宿主 5433 → 容器 5432：与项目里既有的 DATABASE_URL 保持一致
+      - '5433:5432'
+    volumes:
+      - evalhub_pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U evalhub -d evalhub']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  evalhub_pgdata:

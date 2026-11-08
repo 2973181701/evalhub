@@ -1,416 +1,208 @@
-# EvalHub · LLM 评测与标注一体化平台
+# EvalOps · 企业级 LLM 评测与标注平台
 
-> **用 MoonBit 写核心引擎，Vue 3 写前端**，让「**评测发现模型问题 → 标注偏好数据 → 生成分析报告 → 导出 RLHF 训练数据**」形成闭环。
+> 从一个「能跑通的评测脚本」升级为**可部署、可并发、可审计、可复现**的评测平台。
+> 核心问题不是「怎么调一个模型 API」，而是：**凭什么相信一个评分器的结果？**
 >
-> 状态：**四个引擎全部完成 + 后端 + 前端全部跑通 + WASM 目标已验证** ｜ 引擎单测 **75/75 通过** ｜ 全部数字来自真实数据，可逐项复现
+> v1（[历史 README](docs/README_v1.md)）：MoonBit 纯函数引擎 + JSON 文件 + 单体页面。
+> **v2（当前）**：PostgreSQL 版本化数据层、异步评测队列、多实例安全领取、RBAC、
+> LLM-as-Judge 一致性实验、模型对比、盲标队列与留出集评估。
 
 ---
 
-## 一、这个项目解决什么问题
+## 实测状态
 
-单个「评测脚本」或单个「标注小工具」都只能解决链条的一段。EvalHub 把三段接起来：
-
-| 环节 | 常见做法 | EvalHub 的做法 |
-|---|---|---|
-| 评测 | 写个 Python 脚本打印分数 | MoonBit 评测引擎，5 维评分 + 确定性规则，可单测、可跨语言调用 |
-| 标注 | 用 Excel / Label Studio 标完导 CSV | MoonBit 标注引擎做**入库前校验** + 质检标记（低置信度 / 平手 / 零区分度样本） |
-| 分析 | 手工算平均分 | MoonBit 分析引擎出均分、雷达图、争议样本、**Fleiss' κ 一致性** |
-| 交付 | 一堆 CSV | MoonBit 数据引擎直接导出 **RLHF 偏好训练集**（DPO / 对话式两种格式） |
-
-**一句话**：评测的结果要能变成标注任务，标注的结果要能变成可训练的偏好数据——这条链路是 AI 训练师 / 数据标注岗的真实工作流。
-
----
-
-## 二、架构（三层，职责严格不重叠）
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│  Vue 3 前端（Vite）                                            │
-│  评测看板  ·  A/B 标注界面  ·  报告页（手写 SVG 雷达图 + 导出）    │
-│                    ↕  HTTP（Vite proxy → 3000）               │
-├──────────────────────────────────────────────────────────────┤
-│  Node 网关（backend/）                                         │
-│  调 GLM API  ·  编排调用  ·  暴露 HTTP 接口                     │
-│  ⚠ 不做任何业务计算 —— 规则只在引擎里定义一处                     │
-│                    ↕  import（moon build --target js）         │
-├──────────────────────────────────────────────────────────────┤
-│  MoonBit 核心引擎（core/）—— 本项目的灵魂                        │
-│  ┌──────────┬──────────┬──────────┬──────────┐               │
-│  │ 评测引擎  │ 标注引擎  │ 分析引擎  │ 数据引擎  │               │
-│  └──────────┴──────────┴──────────┴──────────┘               │
-│  纯函数：JSON 字符串进 → JSON 字符串出；不碰网络、不碰 DOM          │
-└──────────────────────────────────────────────────────────────┘
-```
-
-### 为什么这么分层（面试必讲）
-
-1. **引擎是纯函数**：输入输出都是 JSON 字符串，没有全局状态、没有副作用 → 可以脱离网络和浏览器**单测**，也可以被任何语言调用。**这条设计原则已经被验证**：同一套源码除了编成 JS，还编成了自包含的 WASM，两形态输出逐字符一致（见下）。
-2. **网关只做编排**：唯一需要网络的环节（调大模型）放在网关，引擎完全不感知网络 → 引擎的测试不需要 mock HTTP。
-3. **规则单点定义**：曾被这个问题咬过——网关层「顺手」过滤了一次平手样本，导致导出计数和引擎对不上（详见 `docs/踩坑记录.md` 坑 23）。修正后所有业务规则只在 MoonBit 里写一遍。
-
-### 同一套源码，两种编译目标
-
-引擎源码只写一份，`moon build` 换目标即可：
-
-| 目标 | 产物 | 体积 | 依赖 | 用途 |
-|---|---|---|---|---|
-| `--target js` | `src.js`（ESM） | 96 KB | 无 | **当前生产路径**，Node 直接 `import` |
-| `--target wasm-gc` | `src.wasm` | 171 KB | **0 个导入** | 已验证：可嵌入任何 WASM 宿主 |
-
-**关键难点：WebAssembly 没有跨边界的字符串类型。**
-
-wasm-gc 里 MoonBit 的 `String` 是 GC 结构体，JS 侧既造不出也读不出，直接传会报
-`TypeError: type incompatibility when transforming from/to JS`。这是 WASM 的固有边界，
-不是 MoonBit 的缺陷——Rust 用 wasm-bindgen、C 用手动指针+长度、Go 用 syscall/js，
-每个语言都得自己适配。本版本 MoonBit 不带 JS glue，所以项目自己写了最小适配层
-`core/src/engine_wasm_abi.mbt`：**码点缓冲 + 索引寻址，只传 `Int`**。
-
-```
-JS 侧                                    MoonBit 侧
-abi_clear()                       →      清空缓冲区
-abi_push(cp)   × N                →      逐个追加输入码点
-abi_run(op)                       →      跑引擎，结果写回缓冲区
-abi_len() / abi_read(i)  × N      →      逐个读出输出码点
-```
-
-> ⚠️ **一个真踩到的坑**：搬的必须是**码点**（`codePointAt`），不是 UTF-16 码元（`charCodeAt`）。
-> MoonBit 的 `Char` 是 32 位完整码点，代理区码元会被 `Int::to_char` 判为非法并替换成 U+FFFD
-> ——emoji 就这么丢了。`"加油💪".length()` 是 4（码元）但 `for ch in s` 只迭代 3 次（码点），
-> 这个差异是实测出来的。详见 `docs/踩坑记录.md` 坑 29。
-
-正确性不靠「编出来了」宣称，靠两处独立验证：
-
-```bash
-node tools/wasm_smoke.mjs    # 用真实数据把两形态输出逐字符比对 → 64 / 64 一致
-```
-
----
-
-## 三、四个引擎的数据契约
-
-全部是 `JSON 字符串 → JSON 字符串`，非法输入返回 `{"error": "..."}` 而不向宿主抛错。
-
-### 1. 评测引擎 `eval_engine`
-
-```jsonc
-// 输入
-{ "prompt": "水的化学式是什么？", "answer": "水的化学式是H₂O，由两个氢原子和一个氧原子组成。",
-  "reference": "H2O", "task_type": "事实问答" }
-// 输出
-{ "accuracy": 5, "completeness": 5, "logic": 3, "safety": 5, "expression": 4.5, "total": 4.5 }
-```
-
-五个维度各有**独立的纯函数**，可插拔、可单测：参考要点命中率（准确性）、要点覆盖度（完整性）、推导与代码结构标记词（逻辑性）、敏感词与拒绝表态（安全性）、题型长度区间 + 结构标点 + 刷字惩罚（表达质量）。
-
-### 2. 标注引擎 `annotate_engine`
-
-```jsonc
-// 输入
-{ "id": "K01", "answer_A": "...", "answer_B": "...", "choice": "A", "reason": "选 A：…", "confidence": 5 }
-// 输出
-{ "id": "K01", "valid": true, "errors": [], "flags": [], "choice": "A", "confidence": 5 }
-```
-
-- **校验失败**（`valid: false`，拒收）：choice 不在 {A, B, 平手} / reason 为空 / confidence 不是 1–5 的整数 / 缺待比较的回答。
-- **质检标记**（不阻断入库，只提示复核）：`low_confidence`、`reason_too_short`、`tie_needs_review`、`identical_answers`。
-- choice 做了归一化：大小写、前后空白不敏感，`tie` / `TIE` 都识别为「平手」。
-
-### 3. 分析引擎 `analyze_engine` / `consistency_engine`
-
-```jsonc
-// analyze_engine：一批评分 → 均分 / 雷达图 / 分题型 / 需复核样本
-{ "count": 20, "skipped": 0,
-  "dimensions": { "accuracy": 2.68, "completeness": 3.7, "logic": 3.45, "safety": 4.95, "expression": 4.4 },
-  "total": 3.84,
-  "radar": [ { "key": "accuracy", "label": "准确性", "value": 2.68, "ratio": 0.54 }, "..." ],
-  "by_task_type": [ { "task_type": "事实问答", "count": 4, "total": 4.18 }, "..." ],
-  "lowest_total": [ { "id": "C03", "task_type": "代码生成", "total": 2.6 }, "..." ],
-  "max_spread":   [ { "id": "R01", "task_type": "逻辑推理", "spread": 5 }, "..." ] }
-
-// consistency_engine：多人标注 → 一致率 + Fleiss' κ
-{ "annotators": ["human", "rule_judge"], "items_rated": 20, "items_complete": 20,
-  "pairwise_agreement": 0.2, "unanimous_rate": 0.2,
-  "fleiss_kappa": -0.2982, "kappa_note": "", "disputed_items": ["K01", "K02", "..."] }
-```
-
-**样本不足时返回 `null` 并说明原因，绝不编数字**——例如只有 1 位标注者时：
-
-```json
-{ "fleiss_kappa": null, "kappa_note": "只有 1 位标注者，一致性无从谈起（κ 需 ≥2 人）" }
-```
-
-### 4. 数据引擎 `export_rlhf`
-
-```jsonc
-// 输入
-{ "format": "dpo", "annotations": [ { "id": "K01", "prompt": "…", "answer_A": "…", "answer_B": "…", "choice": "A" } ] }
-// 输出
-{ "format": "dpo", "total": 20, "exported": 18, "dropped": 2,
-  "dropped_detail": { "tie": 2, "invalid_choice": 0, "missing_answer": 0, "identical": 0 },
-  "data": [ { "id": "K01", "task_type": "事实问答", "prompt": "…", "chosen": "…", "rejected": "…" } ] }
-```
-
-转换规则：`choice=A` → `chosen=answer_A`；`choice=B` → 对调；**平手丢弃**（没有偏好信号，喂进去只会教坏模型）；非法 choice / 缺字段 / chosen 与 rejected 相同（零信息样本）一并丢弃并分别计数。
-
-`format=openai` 输出对话式 messages 结构。
-
----
-
-## 四、快速开始（3 步跑起来）
-
-> 前置：MoonBit CLI（[下载](https://www.moonbitlang.cn/download/)）、Node.js ≥ 18（推荐 22）
-
-### 第 1 步：编译 MoonBit 引擎
-
-```bash
-cd core
-moon check                          # 类型检查
-moon fmt --check                    # 格式检查（本项目代码符合 MoonBit 官方格式）
-moon test                           # 单元测试 → Total tests: 75, passed: 75, failed: 0
-moon build --target js              # 编译成 ESM JavaScript，供 Node 直接 import
-moon build --target wasm-gc         # 可选：编译成自包含 .wasm（171 KB，0 依赖）
-cd ..
-```
-
-### 第 2 步：起后端（3000 端口）
-
-```bash
-cd backend
-npm install
-node server.js
-```
-
-启动后会打印引擎版本、产物路径、以及大模型配置状态。**大模型密钥是可选的**：
-
-- 若 `llm-eval-project/config.json` 里配了 `api_key`，`/api/eval`（调 GLM 生成回答）可用；
-- 若没配，其余所有接口（打分 / 标注 / 报告 / 导出）**照样能用**——引擎不依赖网络。
-
-### 第 3 步：起前端（5173 端口）
-
-```bash
-cd frontend
-npm install
-npx vite
-```
-
-打开 <http://127.0.0.1:5173>。
-
-### 可选：用真实数据重新生成产物
-
-```bash
-node tools/build_dataset.mjs      # 需要先完成第 1 步
-```
-
-它会读取真实数据集，跑完四个引擎，把产物写进 `data/out/`（打分 / 报告 / 校验 / RLHF 数据集 / 一致性）。
-
-### 可选：一键验收全部指标
-
-```bash
-node tools/wasm_smoke.mjs      # WASM 与 JS 两形态逐字符比对 → 64 通过 / 0 失败
-node tools/audit_numbers.mjs   # 文档里的数字 vs 真实产物  → 31 通过 / 0 失败
-node tools/api_verify.mjs      # 12 个 HTTP 接口（自动拉起后端）→ 43 通过 / 0 失败
-```
-
-或直接双击 `verify.bat`，12 步一键跑完全部验收。
-
-> `audit_numbers.mjs` 存在的理由：文档里的数字一旦和可复现产物不一致，就是「造假」——
-> 哪怕只是手抄错一位。这个脚本把 README / 报告里引用的每个关键数字都拉去和
-> `data/out/` 对照。**它真的抓到过错**（见 `docs/踩坑记录.md` 坑 31）。
->
-> 两个脚本都**跑完自动还原运行期状态**（`data/out/annotations_submitted.json`）。
-> 原因见坑 32：验证脚本如果会改数据，「验证通过」这句话本身就不成立。
-> `api_verify.mjs` 还会自己拉起后端、跑完自己关掉，所以不需要手动开终端。
-
----
-
-## 五、界面截图
-
-> 截图由 `node tools/capture_screenshots.mjs` 用本机 Edge 无头模式 + CDP 自动生成，**截的是真实交互状态**（真实大模型调用、真实引擎校验反馈）。
-
-### 评测看板 · 现调 GLM 生成回答并打分
-
-![评测看板](docs/screenshots/02-eval-glm-live.png)
-
-左侧是 20 条真实评测题；右侧五维分数条由 MoonBit 评测引擎算出。图上这次是**真实调用 glm-4-flash**（截图那次 2467 ms，每次调用不同）后打出的 4.5 分。
-
-### 标注界面 · 提交后引擎校验反馈
-
-![标注界面](docs/screenshots/04-annotate-validated.png)
-
-A/B 双栏对比（A 版 2 字、B 版 581 字），选偏好 → 填理由 → 选置信度 → 提交。底部绿色条是 **MoonBit 标注引擎返回的校验结果**：`校验通过，已入库 / 归一化结果：choice = A, confidence = 4`。
-
-### 报告页 · 五维雷达图与一致性分析
-
-![报告页](docs/screenshots/05-report.png)
-
-雷达图是**手写 SVG**（零 ECharts 依赖），数据来自分析引擎对 20 条真实数据的统计。
-
-![一致性分析](docs/screenshots/06-report-consistency.png)
-
-一致性面板：人工 vs 规则引擎一致率 20%、κ = −0.2982；以及「只有 1 位标注者 → κ = null + 原因」的诚实呈现。
-
-其余截图：`01-eval-board.png`（对已有回答打分）、`03-annotate.png`（标注填写中）、`07-report-export.png`（RLHF 导出结果）。
-
----
-
-## 六、HTTP 接口一览
-
-| 方法 | 路径 | 作用 | 需要大模型 |
-|---|---|---|---|
-| GET | `/api/health` | 引擎版本、产物路径、GLM 配置状态（**不含密钥**） | 否 |
-| GET | `/api/prompts` | 20 条评测题 + 已存的真实回答 | 否 |
-| GET | `/api/dataset` | 20 组 A/B 偏好对 + 当前标注状态 | 否 |
-| POST | `/api/score` | 给一段现成回答打五维分 | 否 |
-| POST | `/api/eval` | 调 GLM 生成回答 → 引擎打分 | **是** |
-| POST | `/api/eval/batch` | 批量评测（串行 + 节流，防限流） | **是** |
-| POST | `/api/annotate` | 提交标注（引擎校验通过才入库） | 否 |
-| POST | `/api/annotate/check` | 只校验不落库（前端实时提示） | 否 |
-| GET | `/api/report` | 汇总报告：均分 / 雷达图 / 一致性 / 标注质量 | 否 |
-| GET | `/api/consistency` | 一致性单查 | 否 |
-| GET | `/api/scores` | 20 条真实回答的打分明细 | 否 |
-| POST | `/api/export` | 导出 RLHF 训练集（`dpo` / `openai`） | 否 |
-
-统一响应壳：成功 `{ ok: true, data: ... }`，失败 `{ ok: false, error: "..." }`。
-
----
-
-## 七、真实数字（可复现）
-
-全部来自 20 条真实评测题 + 20 条 GLM 真实回答 + 20 组真实 A/B 偏好对 + 20 条真实人工标注。
-
-| 指标 | 数值 |
+| 项 | 结果 |
 |---|---|
-| MoonBit 引擎单元测试 | **75 / 75 通过** |
-| WASM 形态一致性比对 | **64 / 64 通过**（`wasm-gc` 与 `js` 输出逐字符一致） |
-| WASM 产物 | **171.4 KB**，12 个导出、**0 个导入**（自包含，无 JS glue） |
-| 五维均分 | 准确性 2.68 / 完整性 3.70 / 逻辑性 3.45 / 安全性 4.95 / 表达质量 4.40 |
-| 总分均分 | **3.84 / 5** |
-| 分题型均分 | 事实问答 4.18 / 逻辑推理 3.83 / 文本摘要 3.00 / 情感分析 4.43 / 代码生成 3.80 / 创意写作 3.67 |
-| 标注校验通过率 | **20 / 20** |
-| 平手率 | **10.0%**（标注规范要求 ≤30%） |
-| 平均置信度 | 4.4 / 5 |
-| RLHF 导出 | 20 条标注 → **18 条偏好样本**（丢弃 2 条平手） |
-| 人工 vs 规则引擎判优一致率 | 20.0%，Fleiss' κ = **−0.2982** |
-| 人工标注者之间的 κ | **null**（只有 1 位标注者，样本不足） |
-| 数字审计（文档 vs 产物） | **31 / 31 一致** |
-| 后端接口验收 | **43 / 43 通过**（12 个接口，含 1 次真实 GLM 调用） |
+| 接口验收 | **43 / 43 通过**（含一次真实大模型调用） |
+| 单元测试 | **22 / 22**（规则层 12 + 统计层 10） |
+| MoonBit 引擎 | **75 / 75** |
+| 前端构建 | Vue 3 + Vite，126.12 kB（gzip 46.77） |
+| 基线评测 | glm-4-flash，20/20 有效，总分 **3.88**，p50 **4.2s** / p90 **14.2s** |
+| 重测稳定性 | 同配置两次独立运行，总分 3.86 → 3.88（**Δ +0.02，<1%**） |
+| 多实例队列 | 双实例并发 6 个任务，**零重复执行** |
+| Judge 一致性 | 提示词迭代使 Cohen's κ **0.3204 → 0.6341**（一致率 65% → 85%） |
+| 标注队列 | 120 组 A/B，8 种失败模式，36 条留出集，零跨题泄漏 |
+| 部署 | 提供 `deploy/bootstrap.sh` 一键脚本（Ubuntu 24.04 + PG + nginx + pm2），已在公网实测；v2 需重新上传部署包 |
+
+所有数字来自真实运行，可用仓库内脚本复算；没有占位符或估算值。
 
 ---
 
-## 八、已知边界与设计取舍（诚实声明）
+## 一、解决了什么
 
-这个项目刻意把「能算什么、不能算什么」讲清楚，而不是把数字包装得好看。
+大多数「LLM 评测项目」停在一张平均分表。企业真正卡住的是四件事：
 
-### 1. 规则引擎能筛，不能判
+1. **结果不可复现** —— 数据集改了但版本号没变，上周的分数这周对不上。
+2. **评测阻塞界面** —— 20 条同步跑，页面转圈，中途关掉就全丢。
+3. **没法证明评分器可信** —— 换了个「更聪明」的评委，凭什么说它比规则打分好？
+4. **上线后没人敢用** —— 没有鉴权、没有审计、没有成本核算，写接口谁都能调。
 
-20 条真实数据上，人工标注与规则引擎判优的**一致率只有 20%，κ = −0.30**。这不是 bug，是真结论：
-
-- 人工按标注规范判「简洁约束版 A 更好」（16/20），因为规范写明「同等信息量下简洁者优先」；
-- 规则引擎按五维总分判「详尽版 B 更好」，因为它只会给信息更多的回答更高的完整性分，**它不理解「格式约束优先」这条规范**。
-
-**结论**：规则引擎负责低成本、可复现的**筛查**，语义层面的**判断**必须交给人工标注（本平台的标注界面）与 LLM-as-Judge（后续迭代）。这个低一致率恰好证明了标注环节的价值。
-
-### 2. 准确性维度对「同义改写」会误杀
-
-规则引擎按字符级要点命中判定准确性。参考答案写「泛化变差」、回答写「在未见过的数据上表现不佳」——语义一致但字面不同，规则引擎判不中。
-
-因此准确性维度应读作**下界信号**，不是模型能力的定论。
-
-> 已经修掉的一类真 bug：模型输出常用 Unicode 下标（`H₂O` 的 `₂` 是 U+2082），早期版本判不中，修复后准确性均分从 2.42 升到 2.68、事实问答类从 3.68 升到 4.18。详见 `docs/踩坑记录.md` 坑 20。
-
-### 3. 单人标注无法计算一致性
-
-当前 20 条标注由 1 人完成，**人工之间的 κ 无法计算**。引擎返回 `null` 并给出原因，前端报告页把这句话原样展示。
-
-报告里那个「人工 vs 规则引擎」的一致率是**两个真实评分者**的真实结果，可以直接写进材料——但它衡量的是「人与规则的差异」，不能当成人际一致性。
-
-### 4. 已做与未做
-
-**已做（Wasm 目标已跑通并验证）**
-
-- `moon build --target wasm-gc` 产出 **171.4 KB 自包含 `.wasm`**（12 个导出函数、**0 个导入**，不依赖任何 JS glue）。
-- 因为 WebAssembly 没有跨边界字符串类型，额外写了最小适配层 `src/engine_wasm_abi.mbt`（码点缓冲 + 索引寻址，只传 `Int`），把五个引擎搬到 WASM 侧。
-- `node tools/wasm_smoke.mjs` 用**真实数据**把两种目标逐字符比对：**64 项全部一致**。含非 BMP 字符（emoji / 生僻字）双向往返用例。详见 `docs/踩坑记录.md` 坑 28–30。
-
-**未做（诚实声明）**
-
-- 生产环境仍跑 JS 目标。WASM 形态是**已验证可行的能力**，不是当前运行路径——后端直接 `import` JS 产物更简单，WASM 的价值在于「引擎可脱离 JS 运行时、以二进制形态嵌入任何宿主」。
-- 后端未接 WASM。若要用，`tools/wasm_smoke.mjs` 里的 `wasmCall()` 就是现成的调用封装。
-- LLM-as-Judge：接口层已预留（评测引擎的可插拔断言设计就是为它准备的），本期未接。
-- 多人标注流程：数据结构与算法已就绪（`consistency_engine` 支持任意多标注者），缺的是第二个真人标注者。
+v2 逐条对应：数据集不可变版本 + `config_hash`；异步队列 + 行锁领取；
+Cohen's κ 量化 Judge 与人工的一致性；JWT 三角色 + 审计日志。
 
 ---
 
-## 九、目录结构
+## 二、架构
 
 ```
-evalhub/
-├── core/                     # MoonBit 核心引擎（本项目灵魂）
-│   ├── moon.mod
-│   └── src/
-│       ├── engine_eval.mbt        评测引擎（5 维评分）
-│       ├── engine_annotate.mbt    标注引擎（校验 + 质检标记）
-│       ├── engine_analyze.mbt     分析引擎（统计 + 一致性 + 雷达图）
-│       ├── engine_data.mbt        数据引擎（RLHF 导出）
-│       ├── engine_wasm_abi.mbt    WASM 跨边界适配层（码点缓冲 ABI）
-│       ├── moon.pkg               ← JS / wasm-gc 双目标导出配置
-│       └── *_wbtest.mbt           白盒单测（75 个用例）
-├── backend/                  # Node 网关
-│   ├── engine.js                  加载 MoonBit 编译产物
-│   ├── glm.js                     GLM 客户端（密钥只从本地配置读 + 请求节流）
-│   ├── store.js                   数据仓库（真实数据 + 运行期标注）
-│   └── server.js                  HTTP 接口
-├── frontend/                 # Vue 3 + Vite
-│   └── src/
-│       ├── App.vue                顶部导航 + 后端健康状态
-│       ├── api.js                 接口封装
-│       ├── components/            ScoreBars（五维分数条）/ RadarChart（手写 SVG 雷达图）
-│       └── views/                 EvalBoard / AnnotateView / ReportView
-├── tools/
-│   ├── build_dataset.mjs     真实数据管道（跑四引擎 → 写 data/out/）
-│   ├── capture_screenshots.mjs  用本机 Edge 无头 + CDP 自动生成界面截图
-│   ├── engine_smoke.mjs      Node import MoonBit 引擎的跨语言冒烟测试
-│   ├── wasm_smoke.mjs        WASM 与 JS 两形态逐字符比对（64 项）
-│   ├── audit_numbers.mjs     文档里的数字 vs 真实产物（31 项，防手抄错）
-│   └── api_verify.mjs        12 个 HTTP 接口全量验收（43 项，自动起后端）
-├── data/                     真实数据快照 + 引擎产物（可复现）
-├── docs/
-│   ├── 踩坑记录.md           35 条真实报错与解法（1329 行，面试弹药）
-│   └── screenshots/          界面截图（由脚本自动生成）
-├── verify.bat                Windows 一键验收
-├── LICENSE                   MIT
-└── README.md
+Vue 3 前端（6 个页面 + 登录）
+        │  /api 反向代理
+        ▼
+Express 网关  ── JWT / RBAC / 审计
+        │
+        ├── repo/  ── PostgreSQL 17（主） 或 JSON（回退，接口完全一致）
+        ├── jobs/  ── 异步评测队列（FOR UPDATE SKIP LOCKED）
+        ├── judge/ ── LLM-as-Judge + 确定性规则前置
+        ├── labeling/ ── 盲标队列 / 留出集 / κ 统计
+        ├── compare.js ── 双 run 五维差异
+        └── engine.js ── MoonBit 纯函数引擎（评分规则单点定义）
 ```
 
----
-
-## 十、数据来源声明
-
-`data/` 下的数据来自本仓库作者的另外两个真实项目，**原文件只读、未做任何修改**：
-
-| 文件 | 来源 | 内容 |
-|---|---|---|
-| `prompts.json` | `llm-eval-project/prompts.json` | 20 条评测题，6 种题型，含参考答案 |
-| `answers.json` | `llm-eval-project/outputs/answers.json` | GLM 对 20 题的真实回答 |
-| `pairs.json` | `data-annotation-project/data/pairs.json` | 20 组 A/B 偏好对（简洁约束版 vs 详尽展开版） |
-| `annotations.json` | `data-annotation-project/annotations/annotations_summary.csv` | 20 条人工标注（choice / reason / confidence） |
-
-`data/out/` 是引擎跑出来的产物，可用 `node tools/build_dataset.mjs` 一键重新生成。
+**关键约定**：评分规则只在 MoonBit 引擎里定义一次，网关层不做业务计算；
+数据集一经导入不可修改，改内容就新增 version；所有 run 记录 `config_hash`。
 
 ---
 
-## 十一、借鉴声明
+## 三、快速开始
 
-架构设计借鉴以下开源项目，**代码为原创实现**：
+### 方式 A：Docker（推荐）
 
-| 项目 | 借鉴了什么 |
+```bash
+git clone https://github.com/2973181701/evalhub.git && cd evalhub
+cp .env.example backend/.env        # 填 GLM_API_KEY（可选）
+docker compose -f docker-compose.dev.yml up -d
+psql "postgres://evalhub:evalhub@127.0.0.1:5433/evalhub" -f db/schema.sql
+DATABASE_URL=postgres://evalhub:evalhub@127.0.0.1:5433/evalhub node db/migrate.mjs
+node backend/server.js
+```
+
+### 方式 B：本地（免 Docker）
+
+```bash
+npm install && (cd frontend && npm install)
+cd core && moon build --target js && cd ..   # 后端依赖编译产物
+node backend/server.js                       # JSON 模式，无需数据库
+(cd frontend && npm run dev)                 # http://localhost:5173
+```
+
+> `moon test` **不会**产出 `core/_build/.../src.js`，必须单独 `moon build --target js`，
+> 否则后端启动即退出并提示找不到引擎产物（这个坑在 v1 文档里记过）。
+
+### 方式 C：服务器
+
+见 `deploy/bootstrap.sh`（2G swap → PG/nginx/node → 建库迁移 → pm2 → 前端构建 → nginx 配置）
+与 `deploy/nginx-evalhub.conf`。后端默认只监听 `127.0.0.1`，公网入口只留 nginx。
+
+---
+
+## 四、核心能力
+
+| 模块 | 说明 |
 |---|---|
-| [Label Studio](https://github.com/HumanSignal/label-studio) | 标注平台「项目 → 任务 → 标注 → 质检 → 导出」的完整工作流 |
-| [Promptfoo](https://github.com/promptfoo/promptfoo) | 声明式配置 + **可插拔断言引擎**（本项目把它落成「每个维度一个独立纯函数」） |
-| [EvalScope](https://github.com/modelscope/evalscope) | Web 看板 + 报告可视化 |
+| **数据层** | 9 表 + 迁移，数据集不可变版本化，`eval_runs.config_hash` 保证可复现；迁移事务化、幂等、支持 `--dry-run` |
+| **评测队列** | `POST /api/runs` 提交即返回，轮询进度，可取消；`FOR UPDATE SKIP LOCKED` 保证多副本不重复跑；重启后 stale 任务标 failed |
+| **鉴权** | Node 内置 crypto 自签 HMAC-SHA256 + scrypt 口令，三角色 RBAC；默认关闭以便本地演示 |
+| **模型对比** | 只在两次都跑过的题上比，数据集版本不同直接判不可比，差值方向固定 B−A |
+| **LLM-as-Judge** | 五维打分 + A/B 偏好判定，严格 JSON、版本化缓存、5xx/429 分类重试；返回两两 Cohen κ 与三方 Fleiss κ |
+| **盲标队列** | 120 组 A/B、8 种失败模式、位置随机化、按题目切分留出集；界面屏蔽设计意图与分组 |
+| **报告** | 五维均值、按题型归因、P50/P90 延迟、失败条目、Markdown 导出 |
 
 ---
 
-## 十二、License
+## 五、评测方法：Judge 到底可不可信
 
-[MIT](./LICENSE)
+完整实验见 [`reports/judge_prompt_experiment.md`](reports/judge_prompt_experiment.md)。
+
+让三个「评分者」对同一批 20 组 A/B 做偏好判定：人工标注（金标准）、规则判优、LLM-as-Judge。
+
+| 配置 | 一致率 | Cohen κ | 95% CI |
+|---|---:|---:|---|
+| v2 规则优先 | 65.0% | 0.3204 | [-0.060, 0.663] |
+| v3 +4 个 few-shot | 55.0% | 0.2742 | [0.009, 0.561] |
+| **v4 +隐式形态约束** | **85.0%** | **0.6341** | [0.219, 1.0] |
+| v5 +先自解 | 80.0% | 0.5122 | [-0.035, 0.885] |
+| v6 两步调用（决策表） | 55.0% | 0.2742 | [0.043, 0.554] |
+| **hybrid 规则前置** | **85.0%** | **0.6341** | [0.219, 1.0] |
+
+三个值得记住的结论：
+
+1. **加 few-shot 反而变差。** 模型把「短答案该赢」学成了「只有明文约束才算约束」，
+   于是把「中国的首都是哪个城市？」判成平手。有效改动是**把人类真正在用的规则写出来**
+   （题目要求的输出形态本身就是约束），不是多给例子。
+2. **规则越多，弱模型越逃向「平手」。** v6 有 5 种情形，平手率涨到 50%–65%；
+   它甚至在 A 4 字 / B 315 字时写「形态详略相当」。v4 最好，恰恰因为只有一条主线。
+3. **可计算的事不该问模型。** v4 曾在两个**逐字节相同**的答案之间编造出「A 更简洁」。
+   改成代码守卫后，单条修复就让 κ 从 0.4667 升到 0.6341；hybrid 进一步把
+   枚举标签题与明确字数上限交给确定性规则，20% 判定不再依赖模型。
+
+> ⚠️ 上述 κ 均为 **in-sample**（提示词就是照这 20 条的错误改出来的），且 n=20、
+> B / 平手各仅 2 条，CI 很宽。可信数字需要留出集 —— 流水线已就绪，
+> 见 [`reports/label_pipeline.md`](reports/label_pipeline.md)。
+
+---
+
+## 六、数据飞轮（v2 新增）
+
+```
+评测任务产生回答 → 生成 A/B 对 → 盲标队列（人）→ 留出集 κ 复评
+                                      ↓
+                          导出 DPO/SFT → 微调 → 再评测
+```
+
+- 40 道新题 × 3 = **120 组 A/B**，覆盖 8 种失败模式；设计意图 A54/B36/平手30，接近均衡
+- 位置按哈希随机化（平均长度 A 64 / B 72 字），消除位置偏差
+- 按**题目**哈希切分：train 84 / **test 36**，同题所有变体同侧，零泄漏
+- 三条防线：盲标字段白名单、标签来源不可伪造（`label_source` 服务端决定）、
+  test 集无真人标签时**拒绝输出 κ**
+
+```bash
+npm run label:build -- --batch queue-v1   # 生成
+# 打开 #labelqueue 逐条人工标注
+npm run label:heldout                     # 出留出集报告
+```
+
+---
+
+## 七、诚实边界
+
+- **Judge 尚未达到可替代人工的水平**：κ 0.6341 刚过常用门槛 0.6，但 CI 宽、样本小。
+- **留出集标签仍需人工标注**，仓库里不含任何伪造标签；测试夹具一律标记并被排除。
+- **训练层（QLoRA / SFT）尚未实现** —— 本项目目前是评测与数据层，不是模型训练平台。
+- **token 计量未接真实计费**，`tokens_in/out` 为 null，成本字段不可对外承诺。
+- **进程内队列在 PG 模式下已改为数据库领取**；若用 JSON 模式仍为进程内队列，多副本会重复执行。
+- 题目与生成答案来自自建题库与确定性模板，**不是真实业务语料**。
+
+---
+
+## 八、目录
+
+```
+backend/
+  repo/          仓储选择器 + PG/JSON 双实现
+  labeling/      盲标队列（service / repository / stats）
+  jobs/runs.js   异步评测队列
+  judge.js       LLM-as-Judge（提示词版本可切换）
+  judge_rules.js 确定性判优规则
+  auth.js users.js compare.js env.js db.js
+core/            MoonBit 纯函数引擎（75 单测）
+db/              schema.sql / migrate.mjs / migrations/003_label_queue.sql
+tools/           api_verify / baseline_report / judge_experiment / 生成器 / 评估器
+test/            22 项单元测试
+reports/         基线报告、Judge 实验、数据飞轮说明
+deploy/          bootstrap.sh / nginx 配置 / 打包脚本
+docs/            v1 README 归档与踩坑记录
+```
+
+## 九、复现命令
+
+```bash
+npm test                                  # 22 项单测
+node tools/api_verify.mjs                 # 43 项接口验收
+JUDGE_PROMPT=v4 node tools/judge_experiment.mjs
+JUDGE_MODE=hybrid node tools/judge_experiment.mjs
+node tools/baseline_report.mjs --provider glm
+```
+
+## License
+
+MIT · 详见 [LICENSE](LICENSE)

@@ -10,6 +10,8 @@
  */
 import { onMounted, ref, computed } from 'vue';
 import { api } from '../api.js';
+import { canWrite, writeBlockReason } from '../authState.js';
+import { friendlyError } from '../errors.js';
 
 const items = ref([]);
 const loading = ref(true);
@@ -66,6 +68,10 @@ function pick(id) {
 
 async function submit() {
   if (!selected.value) return;
+  if (!canWrite.value) {
+    feedback.value = { type: 'bad', message: writeBlockReason.value };
+    return;
+  }
   submitting.value = true;
   feedback.value = null;
   try {
@@ -84,7 +90,7 @@ async function submit() {
     if (next) pick(next.id);
     feedback.value = fb;
   } catch (e) {
-    feedback.value = { type: 'bad', check: e.payload?.check, message: e.message };
+    feedback.value = { type: 'bad', check: e.payload?.check, message: friendlyError(e) };
   } finally {
     submitting.value = false;
   }
@@ -195,8 +201,10 @@ async function submit() {
             </div>
           </label>
 
+          <div v-if="!canWrite" class="alert" style="margin-bottom: 10px">{{ writeBlockReason }}</div>
+
           <div class="btn-row">
-            <button class="btn primary" :disabled="submitting" @click="submit">
+            <button class="btn primary" :disabled="submitting || !canWrite" @click="submit">
               <span v-if="submitting" class="spinner"></span>
               {{ submitting ? '提交中…' : '提交标注' }}
             </button>

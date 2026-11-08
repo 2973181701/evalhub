@@ -1,0 +1,25 @@
+{
+  "name": "evalhub-tooling",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "EvalHub 仓库级工具依赖（数据层迁移脚本等），不参与运行时服务",
+  "scripts": {
+    "db:migrate": "node db/migrate.mjs",
+    "db:dry-run": "node db/migrate.mjs --dry-run",
+    "test": "node --test test/*.test.mjs",
+    "judge:exp": "node tools/judge_experiment.mjs",
+    "judge:exp:hybrid": "JUDGE_MODE=hybrid node tools/judge_experiment.mjs",
+    "label:build": "node tools/build_label_queue.mjs",
+    "label:heldout": "node tools/eval_judge_heldout.mjs",
+    "push:github": "node tools/push_to_github.mjs",
+    "push:github:yes": "node tools/push_to_github.mjs --yes"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,47 @@
+[
+  {"id":"XK01","task_type":"事实问答","prompt":"《蒙娜丽莎》的作者是谁？","reference":"列奥纳多·达·芬奇","distractor":"米开朗基罗","constraint":"直接给出人名"},
+  {"id":"XK02","task_type":"事实问答","prompt":"光在真空中的速度约为多少？","reference":"约每秒 30 万公里（3×10⁸ m/s）","distractor":"约每秒 30 万公里，但会随光源颜色显著变化","constraint":"直接给数值"},
+  {"id":"XK03","task_type":"事实问答","prompt":"HTTP 状态码 301 表示什么？","reference":"永久重定向","distractor":"临时重定向","constraint":"一句话"},
+  {"id":"XK04","task_type":"事实问答","prompt":"中国现行法定退休年龄中，男职工是多少岁？","reference":"60 周岁","distractor":"55 周岁","constraint":"直接给数值"},
+  {"id":"XK05","task_type":"事实问答","prompt":"DNA 双螺旋结构由谁在 1953 年提出？","reference":"沃森和克里克","distractor":"孟德尔和摩尔根","constraint":"直接给出人名"},
+  {"id":"XK06","task_type":"事实问答","prompt":"世界上面积最大的海洋是哪一个？","reference":"太平洋","distractor":"大西洋","constraint":"直接给名称"},
+  {"id":"XK07","task_type":"事实问答","prompt":"1 字节等于多少比特？","reference":"8 比特","distractor":"16 比特","constraint":"直接给数值"},
+
+  {"id":"XR01","task_type":"逻辑推理","prompt":"所有 A 都是 B，所有 B 都是 C。那么某个 A 一定是 C 吗？","reference":"是，由传递性可推出","distractor":"不一定，因为 A 可能不属于 B","constraint":"先给结论再一句话说明"},
+  {"id":"XR02","task_type":"逻辑推理","prompt":"袋子里有 5 个红球和 3 个蓝球，闭眼至少摸出几个才能保证有 2 个同色？","reference":"3 个（最坏情况前两个不同色，第三个必与其中之一同色）","distractor":"4 个","constraint":"先给结论"},
+  {"id":"XR03","task_type":"逻辑推理","prompt":"如果「下雨则地湿」为真，现在地是湿的，能否推出下过雨？","reference":"不能，肯定后件是无效推理，可能有别的原因","distractor":"能，因为地湿必然由下雨导致","constraint":"先给结论"},
+  {"id":"XR04","task_type":"逻辑推理","prompt":"三个人排队，甲不在最前，乙不在最后，丙在甲前面。谁在中间？","reference":"甲","distractor":"丙","constraint":"先给结论"},
+  {"id":"XR05","task_type":"逻辑推理","prompt":"某数加 7 等于 12，这个数是多少？","reference":"5","distractor":"19","constraint":"直接给数值"},
+  {"id":"XR06","task_type":"逻辑推理","prompt":"数列 2, 6, 12, 20, 30 的下一项是多少？","reference":"42（差依次为 4,6,8,10,12）","distractor":"40","constraint":"先给数值"},
+  {"id":"XR07","task_type":"逻辑推理","prompt":"若今天是周三，100 天后是周几？","reference":"周五（100 mod 7 = 2）","distractor":"周四","constraint":"先给结论"},
+
+  {"id":"XS01","task_type":"文本摘要","prompt":"请用一句话概括：城市推行垃圾分类后，可回收物回收率上升，但居民初期分类错误率较高，需持续宣传引导。","reference":"垃圾分类提升回收率但初期错误率高，需持续引导","distractor":"垃圾分类政策已完全成功，无需后续投入","constraint":"一句话"},
+  {"id":"XS02","task_type":"文本摘要","prompt":"请用一句话概括：新能源车销量增长带动充电桩建设，但老旧小区电力容量不足成为主要瓶颈。","reference":"新能源车增长推动充电桩建设，老旧小区电力容量成瓶颈","distractor":"新能源车销量下降导致充电桩过剩","constraint":"一句话"},
+  {"id":"XS03","task_type":"文本摘要","prompt":"请用不超过 25 字概括：远程会议工具降低了差旅成本，却也带来了会议时长增加与注意力分散的问题。","reference":"远程会议省差旅但会议变长、注意力分散","distractor":"远程会议工具全面提升工作效率且无任何副作用","constraint":"不超过25字"},
+  {"id":"XS04","task_type":"文本摘要","prompt":"请用一句话概括：开源模型降低了企业试用门槛，但私有数据合规与推理成本仍是其规模化的主要障碍。","reference":"开源模型降低门槛，合规与成本仍是规模化障碍","distractor":"开源模型已彻底解决企业所有合规问题","constraint":"一句话"},
+  {"id":"XS05","task_type":"文本摘要","prompt":"请用一句话概括：定期备份能防止数据丢失，但若备份与生产环境同处一机房，火灾等物理灾害仍会导致全损。","reference":"备份防丢失，但同机房备份仍难抵御物理灾害","distractor":"只要定期备份就不可能丢失任何数据","constraint":"一句话"},
+  {"id":"XS06","task_type":"文本摘要","prompt":"请用不超过 25 字概括：缓存能显著降低数据库压力，代价是需要处理缓存与数据库之间的一致性问题。","reference":"缓存减压，但需解决一致性问题","distractor":"缓存会显著增加数据库压力","constraint":"不超过25字"},
+
+  {"id":"XE01","task_type":"情感分析","prompt":"判断情绪（正面/负面/中性）：「等了半小时才上菜，而且菜还是凉的。」","reference":"负面","distractor":"正面","constraint":"三选一标签"},
+  {"id":"XE02","task_type":"情感分析","prompt":"判断情绪（正面/负面/中性）：「包裹已于今日送达，签收人是本人。」","reference":"中性","distractor":"负面","constraint":"三选一标签"},
+  {"id":"XE03","task_type":"情感分析","prompt":"判断情绪（正面/负面/中性）：「客服十分钟就帮我解决了问题，很专业。」","reference":"正面","distractor":"中性","constraint":"三选一标签"},
+  {"id":"XE04","task_type":"情感分析","prompt":"判断情绪（正面/负面/中性）：「页面加载了三次都失败，最后干脆卸载了。」","reference":"负面","distractor":"正面","constraint":"三选一标签"},
+  {"id":"XE05","task_type":"情感分析","prompt":"判断情绪（正面/负面/中性）：「产品说明书共 12 页，含 3 张示意图。」","reference":"中性","distractor":"正面","constraint":"三选一标签"},
+  {"id":"XE06","task_type":"情感分析","prompt":"判断情绪（正面/负面/中性）：「改版之后找功能比以前快多了。」","reference":"正面","distractor":"负面","constraint":"三选一标签"},
+
+  {"id":"XC01","task_type":"代码生成","prompt":"用 Python 写一个函数，判断字符串是否为回文，忽略大小写。","reference":"return s.lower() == s.lower()[::-1]","distractor":"return s == s[::-1]  # 未忽略大小写","constraint":"只给函数"},
+  {"id":"XC02","task_type":"代码生成","prompt":"用 Python 写一个函数，返回列表中的最大值，空列表返回 None。","reference":"return max(lst) if lst else None","distractor":"return max(lst)","constraint":"只给函数"},
+  {"id":"XC03","task_type":"代码生成","prompt":"用 Python 写一个函数，统计字符串中每个字符出现的次数。","reference":"使用 collections.Counter(s) 返回字典","distractor":"只统计字符串总长度 len(s)","constraint":"只给函数"},
+  {"id":"XC04","task_type":"代码生成","prompt":"用 Python 写一个函数，把列表中的重复元素去掉并保持原顺序。","reference":"list(dict.fromkeys(lst))","distractor":"list(set(lst))  # 不保证顺序","constraint":"只给函数"},
+  {"id":"XC05","task_type":"代码生成","prompt":"用 Python 写一个函数，判断一个整数是否为偶数。","reference":"return n % 2 == 0","distractor":"return n % 2 == 1","constraint":"只给函数"},
+  {"id":"XC06","task_type":"代码生成","prompt":"用 Python 写一个函数，计算 1 到 n 的和。","reference":"return n * (n + 1) // 2","distractor":"return n * n","constraint":"只给函数"},
+  {"id":"XC07","task_type":"代码生成","prompt":"用 Python 写一个函数，把两个字典合并，冲突时以第二个为准。","reference":"return {**d1, **d2}","distractor":"return {**d2, **d1}  # 冲突时以第一个为准","constraint":"只给函数"},
+
+  {"id":"XW01","task_type":"创意写作","prompt":"为一家书店写一句 20 字以内的宣传语。","reference":"一盏灯，一本书，一整个安静的下午。","distractor":"本店经营各类图书，欢迎广大读者朋友前来选购，品种齐全价格公道。","constraint":"20字以内"},
+  {"id":"XW02","task_type":"创意写作","prompt":"用两句话写一个关于「等待」的小故事，要有转折。","reference":"他每天都在站台等那班车。第四十天，站台拆了，车终于来了。","distractor":"等待是一种很常见的情绪，很多文学作品都描写过等待，等待可以让人成长，也可以让人焦虑。","constraint":"两句话、有转折"},
+  {"id":"XW03","task_type":"创意写作","prompt":"写一句 20 字以内的雨天文案。","reference":"雨把城市调成了静音模式。","distractor":"下雨天出门记得带伞，注意路面湿滑，行车请减速慢行，确保出行安全。","constraint":"20字以内"},
+  {"id":"XW04","task_type":"创意写作","prompt":"为一款笔记应用写一句 15 字以内的 slogan。","reference":"想到，就留得住。","distractor":"本应用支持多端同步、富文本编辑、标签管理与全文检索，是您高效记录的好帮手。","constraint":"15字以内"},
+  {"id":"XW05","task_type":"创意写作","prompt":"用一句话描写「深夜的便利店」。","reference":"白光像一座不肯睡的小岛。","distractor":"便利店通常营业到很晚，有的甚至是 24 小时营业，为夜间出行的人提供便利。","constraint":"一句话"},
+  {"id":"XW06","task_type":"创意写作","prompt":"写一句 20 字以内的运动品牌文案。","reference":"再跑一步，就是新的自己。","distractor":"本公司成立于上世纪九十年代，专业从事运动服饰研发生产销售，产品远销海内外市场。","constraint":"20字以内"},
+  {"id":"XW07","task_type":"创意写作","prompt":"用一句话给「拖延」下个带点幽默的定义。","reference":"拖延是给明天的自己写的一封道歉信。","distractor":"拖延指推迟或延后本应完成的任务，是一种常见的时间管理问题，心理学上有大量相关研究。","constraint":"一句话"}
+]

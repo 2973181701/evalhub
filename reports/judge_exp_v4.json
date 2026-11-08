@@ -1,0 +1,332 @@
+{
+  "version": "v4",
+  "prompt_version": "prefer-v4",
+  "ran_at": "2026-11-08T05:43:32.902Z",
+  "model": "glm-4-flash",
+  "n": 20,
+  "failed": 0,
+  "cached_hits": 19,
+  "kappa": {
+    "n": 20,
+    "po": 0.85,
+    "pe": 0.59,
+    "kappa": 0.6341
+  },
+  "kappa_ci95": {
+    "lo": 0.2188,
+    "hi": 1,
+    "iterations": 1996
+  },
+  "judge_distribution": {
+    "A": 14,
+    "B": 5,
+    "平手": 1
+  },
+  "human_distribution": {
+    "A": 16,
+    "B": 2,
+    "平手": 2
+  },
+  "length_bias": {
+    "n_b_longer": 19,
+    "judge_picked_b": 5,
+    "judge_rate": 26.3,
+    "human_picked_b": 2,
+    "human_rate": 10.5
+  },
+  "disagreements": [
+    {
+      "id": "S01",
+      "human": "A",
+      "judge": "B",
+      "len_A": 25,
+      "len_B": 37,
+      "reason": "B 概括更全面",
+      "constraint": "隐式，一句话概括"
+    },
+    {
+      "id": "R04",
+      "human": "平手",
+      "judge": "B",
+      "len_A": 1,
+      "len_B": 843,
+      "reason": "B推理过程完整，结论正确",
+      "constraint": "隐式，逻辑推理，找出说真话的人"
+    },
+    {
+      "id": "S03",
+      "human": "A",
+      "judge": "B",
+      "len_A": 16,
+      "len_B": 55,
+      "reason": "B 更具体地概括了远程办公的利弊",
+      "constraint": "文本摘要，一句话概括"
+    }
+  ],
+  "rows": [
+    {
+      "id": "K01",
+      "task_type": "事实问答",
+      "len_A": 2,
+      "len_B": 581,
+      "human": "A",
+      "judge": "A",
+      "agree": true,
+      "reason": "简单事实题，B 过度作答",
+      "constraint": "明确，问一个确定的事实（首都）→ 正确答案本身就是一句到几个字；",
+      "analysis": "A 直接给出正确答案；B 虽然提供了详细信息，但超出了问题所需的简洁答案",
+      "identical": false
+    },
+    {
+      "id": "K02",
+      "task_type": "事实问答",
+      "len_A": 6,
+      "len_B": 852,
+      "human": "A",
+      "judge": "A",
+      "agree": true,
+      "reason": "B 过度作答，未直接回答问题",
+      "constraint": "明确，问光合作用原料，直接回答即可",
+      "analysis": "A 直接给出原料；B 详细解释了光合作用过程，但未直接回答原料",
+      "identical": false
+    },
+    {
+      "id": "K03",
+      "task_type": "事实问答",
+      "len_A": 3,
+      "len_B": 749,
+      "human": "A",
+      "judge": "A",
+      "agree": true,
+      "reason": "B 过度作答，题目只要求化学式",
+      "constraint": "明确，直接给出化学式",
+      "analysis": "A 直接给出正确答案；B 虽然详细解释了化学式，但题目只要求化学式",
+      "identical": false
+    },
+    {
+      "id": "R01",
+      "task_type": "逻辑推理",
+      "len_A": 4,
+      "len_B": 315,
+      "human": "A",
+      "judge": "A",
+      "agree": true,
+      "reason": "简洁直接给出答案",
+      "constraint": "隐式，问一个确定的事实（谁高）",
+      "analysis": "A 直接给出结论；B 解释了推理过程，但题目只要求结论",
+      "identical": false
+    },
+    {
+      "id": "R02",
+      "task_type": "逻辑推理",
+      "len_A": 10,
+      "len_B": 383,
+      "human": "B",
+      "judge": "B",
+      "agree": true,
+      "reason": "B 完成题目要求的两步",
+      "constraint": "明确，须先判断前提正确与否",
+      "analysis": "A 未判断前提；B 正确判断前提并给出理由",
+      "identical": false
+    },
+    {
+      "id": "R03",
+      "task_type": "逻辑推理",
+      "len_A": 8,
+      "len_B": 434,
+      "human": "B",
+      "judge": "B",
+      "agree": true,
+      "reason": "B 直接给出正确答案，A 未给出正确答案",
+      "constraint": "隐式，问一个确定数值，应直接给数",
+      "analysis": "A 未给出正确答案；B 直接给出正确答案，计算过程冗余",
+      "identical": false
+    },
+    {
+      "id": "S01",
+      "task_type": "文本摘要",
+      "len_A": 25,
+      "len_B": 37,
+      "human": "A",
+      "judge": "B",
+      "agree": false,
+      "reason": "B 概括更全面",
+      "constraint": "隐式，一句话概括",
+      "analysis": "A 简洁但略逊于 B 的全面性；B 更全面地概括了原文内容",
+      "identical": false
+    },
+    {
+      "id": "S02",
+      "task_type": "文本摘要",
+      "len_A": 19,
+      "len_B": 19,
+      "human": "平手",
+      "judge": "平手",
+      "agree": true,
+      "reason": "两方回答完全相同",
+      "constraint": "无",
+      "analysis": "文本归一化后完全一致，不存在可区分差异",
+      "identical": true
+    },
+    {
+      "id": "E01",
+      "task_type": "情感分析",
+      "len_A": 2,
+      "len_B": 170,
+      "human": "A",
+      "judge": "A",
+      "agree": true,
+      "reason": "题目只要求标签，B 属冗余",
+      "constraint": "明确，须从三项中选一个",
+      "analysis": "A 直接给出标签；B 长篇论证但题目只要求标签",
+      "identical": false
+    },
+    {
+      "id": "E02",
+      "task_type": "情感分析",
+      "len_A": 2,
+      "len_B": 277,
+      "human": "A",
+      "judge": "A",
+      "agree": true,
+      "reason": "题目只要求标签，B 属冗余",
+      "constraint": "明确，须从正面/负面/中性中选一个",
+      "analysis": "A 直接给出标签；B 长篇解释但题目只要求标签",
+      "identical": false
+    },
+    {
+      "id": "E03",
+      "task_type": "情感分析",
+      "len_A": 2,
+      "len_B": 258,
+      "human": "A",
+      "judge": "A",
+      "agree": true,
+      "reason": "题目只要求标签，B 属冗余",
+      "constraint": "明确，须从正面/负面/中性中选一个",
+      "analysis": "A 直接给出标签；B 长篇解释但题目只要求标签",
+      "identical": false
+    },
+    {
+      "id": "C01",
+      "task_type": "代码生成",
+      "len_A": 170,
+      "len_B": 1151,
+      "human": "A",
+      "judge": "A",
+      "agree": true,
+      "reason": "A 简洁且直接满足题目要求",
+      "constraint": "隐式，函数实现判断素数",
+      "analysis": "A 简洁直接；B 详细解释了代码逻辑，但冗余",
+      "identical": false
+    },
+    {
+      "id": "C02",
+      "task_type": "代码生成",
+      "len_A": 92,
+      "len_B": 838,
+      "human": "A",
+      "judge": "A",
+      "agree": true,
+      "reason": "A 简洁且直接满足要求",
+      "constraint": "隐式，函数实现计算平均值，列表为空返回0",
+      "analysis": "A 简洁直接实现功能；B 过度解释，代码冗余",
+      "identical": false
+    },
+    {
+      "id": "W01",
+      "task_type": "创意写作",
+      "len_A": 15,
+      "len_B": 20,
+      "human": "A",
+      "judge": "A",
+      "agree": true,
+      "reason": "A 更符合字数要求",
+      "constraint": "15字内、贴合奶茶店、有吸引力",
+      "analysis": "A 简洁直接，突出奶茶特点；B 信息量稍多，但字数超限",
+      "identical": false
+    },
+    {
+      "id": "W02",
+      "task_type": "创意写作",
+      "len_A": 60,
+      "len_B": 144,
+      "human": "A",
+      "judge": "A",
+      "agree": true,
+      "reason": "A 更符合题目要求",
+      "constraint": "3句、有情节转折、主题是坚持",
+      "analysis": "A 有明显的情节转折，B 虽有转折但主题偏离了坚持",
+      "identical": false
+    },
+    {
+      "id": "K04",
+      "task_type": "事实问答",
+      "len_A": 2,
+      "len_B": 497,
+      "human": "A",
+      "judge": "A",
+      "agree": true,
+      "reason": "B 提供了多余信息，违反了简洁性原则",
+      "constraint": "明确，回答城市名称即可",
+      "analysis": "A 直接给出城市名称；B 提供了额外信息，但题目只要求城市名称",
+      "identical": false
+    },
+    {
+      "id": "R04",
+      "task_type": "逻辑推理",
+      "len_A": 1,
+      "len_B": 843,
+      "human": "平手",
+      "judge": "B",
+      "agree": false,
+      "reason": "B推理过程完整，结论正确",
+      "constraint": "隐式，逻辑推理，找出说真话的人",
+      "analysis": "A未完成推理过程，B完整推理并得出结论",
+      "identical": false
+    },
+    {
+      "id": "S03",
+      "task_type": "文本摘要",
+      "len_A": 16,
+      "len_B": 55,
+      "human": "A",
+      "judge": "B",
+      "agree": false,
+      "reason": "B 更具体地概括了远程办公的利弊",
+      "constraint": "文本摘要，一句话概括",
+      "analysis": "A 概括了远程办公的常态化和利弊，但不够具体；B 更具体地描述了远程办公的利弊，但稍显冗余",
+      "identical": false
+    },
+    {
+      "id": "C03",
+      "task_type": "代码生成",
+      "len_A": 55,
+      "len_B": 1523,
+      "human": "A",
+      "judge": "A",
+      "agree": true,
+      "reason": "A 完成题目要求，B 过度作答",
+      "constraint": "隐式，函数实现字符串反转",
+      "analysis": "A 直接给出函数实现；B 提供了更多实现方法，但题目只要求一个函数",
+      "identical": false
+    },
+    {
+      "id": "W03",
+      "task_type": "创意写作",
+      "len_A": 32,
+      "len_B": 37,
+      "human": "A",
+      "judge": "A",
+      "agree": true,
+      "reason": "A 符合字数要求",
+      "constraint": "50字内、体现细心和爱学习",
+      "analysis": "A 简洁明了，符合字数要求；B 虽然意思相近，但字数略超要求",
+      "identical": false
+    }
+  ],
+  "cache_stats": {
+    "entries": 101,
+    "file": "data\\out\\judge_cache.json"
+  }
+}

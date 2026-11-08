@@ -1,0 +1,368 @@
+{
+  "version": "v2",
+  "prompt_version": "prefer-v2",
+  "ran_at": "2026-11-08T05:43:32.668Z",
+  "model": "glm-4-flash",
+  "n": 20,
+  "failed": 0,
+  "cached_hits": 19,
+  "kappa": {
+    "n": 20,
+    "po": 0.65,
+    "pe": 0.485,
+    "kappa": 0.3204
+  },
+  "kappa_ci95": {
+    "lo": -0.0596,
+    "hi": 0.6629,
+    "iterations": 2000
+  },
+  "judge_distribution": {
+    "A": 11,
+    "B": 6,
+    "平手": 3
+  },
+  "human_distribution": {
+    "A": 16,
+    "B": 2,
+    "平手": 2
+  },
+  "length_bias": {
+    "n_b_longer": 19,
+    "judge_picked_b": 6,
+    "judge_rate": 31.6,
+    "human_picked_b": 2,
+    "human_rate": 10.5
+  },
+  "disagreements": [
+    {
+      "id": "R01",
+      "human": "A",
+      "judge": "B",
+      "len_A": 4,
+      "len_B": 315,
+      "reason": "B 在相关性与完整度上更胜一筹",
+      "constraint": "题目无硬性约束"
+    },
+    {
+      "id": "S01",
+      "human": "A",
+      "judge": "B",
+      "len_A": 25,
+      "len_B": 37,
+      "reason": "B 回答更完整且相关",
+      "constraint": "题目有硬性约束，要求用一句话概括"
+    },
+    {
+      "id": "E01",
+      "human": "A",
+      "judge": "B",
+      "len_A": 2,
+      "len_B": 170,
+      "reason": "B 在相关性与完整度上更胜一筹",
+      "constraint": "题目无硬性约束"
+    },
+    {
+      "id": "E02",
+      "human": "A",
+      "judge": "平手",
+      "len_A": 2,
+      "len_B": 277,
+      "reason": "两者都准确，表达方式不同",
+      "constraint": "题目无硬性约束"
+    },
+    {
+      "id": "E03",
+      "human": "A",
+      "judge": "平手",
+      "len_A": 2,
+      "len_B": 258,
+      "reason": "A和B都符合事实准确性，且表达质量相当",
+      "constraint": "题目无硬性约束"
+    },
+    {
+      "id": "R04",
+      "human": "平手",
+      "judge": "A",
+      "len_A": 1,
+      "len_B": 843,
+      "reason": "A回答符合题目条件，B回答分析过程冗长且结论错误",
+      "constraint": "题目有硬性约束，字数未超过限制"
+    },
+    {
+      "id": "S03",
+      "human": "A",
+      "judge": "B",
+      "len_A": 16,
+      "len_B": 55,
+      "reason": "B 回答更完整且相关性强",
+      "constraint": "题目有硬性约束，要求概括性回答"
+    }
+  ],
+  "rows": [
+    {
+      "id": "K01",
+      "task_type": "事实问答",
+      "len_A": 2,
+      "len_B": 581,
+      "human": "A",
+      "judge": "A",
+      "agree": true,
+      "reason": "A 满足硬性约束，B 违反了字数限制",
+      "constraint": "题目有硬性约束，要求回答首都是哪个城市",
+      "analysis": "A 直接回答了问题，B 提供了额外信息但违反了字数限制",
+      "identical": false
+    },
+    {
+      "id": "K02",
+      "task_type": "事实问答",
+      "len_A": 6,
+      "len_B": 852,
+      "human": "A",
+      "judge": "A",
+      "agree": true,
+      "reason": "A 满足字数限制，B 超出字数限制",
+      "constraint": "题目有硬性约束，字数限制",
+      "analysis": "A 简洁直接，符合字数限制；B 信息丰富，但超出了字数限制",
+      "identical": false
+    },
+    {
+      "id": "K03",
+      "task_type": "事实问答",
+      "len_A": 3,
+      "len_B": 749,
+      "human": "A",
+      "judge": "A",
+      "agree": true,
+      "reason": "A符合字数要求，B超出了字数限制",
+      "constraint": "题目有硬性约束，字数限制在20字以内",
+      "analysis": "A准确回答了问题，B提供了额外信息但违反了字数限制",
+      "identical": false
+    },
+    {
+      "id": "R01",
+      "task_type": "逻辑推理",
+      "len_A": 4,
+      "len_B": 315,
+      "human": "A",
+      "judge": "B",
+      "agree": false,
+      "reason": "B 在相关性与完整度上更胜一筹",
+      "constraint": "题目无硬性约束",
+      "analysis": "A 直接给出结论，B 详细解释推理过程",
+      "identical": false
+    },
+    {
+      "id": "R02",
+      "task_type": "逻辑推理",
+      "len_A": 10,
+      "len_B": 383,
+      "human": "B",
+      "judge": "B",
+      "agree": true,
+      "reason": "B 在事实准确性和相关性与完整度上优于 A",
+      "constraint": "题目有硬性约束，前提正确性为硬性约束",
+      "analysis": "A 错误地认为前提正确，而 B 正确指出前提错误并给出生物学解释",
+      "identical": false
+    },
+    {
+      "id": "R03",
+      "task_type": "逻辑推理",
+      "len_A": 8,
+      "len_B": 434,
+      "human": "B",
+      "judge": "B",
+      "agree": true,
+      "reason": "B在相关性与完整度上优于A",
+      "constraint": "题目有硬性约束，字数未超过限制",
+      "analysis": "A未给出完整推理过程，B给出了完整的推理过程并得出正确答案",
+      "identical": false
+    },
+    {
+      "id": "S01",
+      "task_type": "文本摘要",
+      "len_A": 25,
+      "len_B": 37,
+      "human": "A",
+      "judge": "B",
+      "agree": false,
+      "reason": "B 回答更完整且相关",
+      "constraint": "题目有硬性约束，要求用一句话概括",
+      "analysis": "B 回答更全面，包含了快速进步、变革多领域、引发隐私及就业等挑战，而 A 回答虽然简洁，但信息量略少",
+      "identical": false
+    },
+    {
+      "id": "S02",
+      "task_type": "文本摘要",
+      "len_A": 19,
+      "len_B": 19,
+      "human": "平手",
+      "judge": "平手",
+      "agree": true,
+      "reason": "两方回答完全相同",
+      "constraint": "无",
+      "analysis": "文本归一化后完全一致，不存在可区分差异",
+      "identical": true
+    },
+    {
+      "id": "E01",
+      "task_type": "情感分析",
+      "len_A": 2,
+      "len_B": 170,
+      "human": "A",
+      "judge": "B",
+      "agree": false,
+      "reason": "B 在相关性与完整度上更胜一筹",
+      "constraint": "题目无硬性约束",
+      "analysis": "A 直接给出结论；B 解释了判断依据，更详细",
+      "identical": false
+    },
+    {
+      "id": "E02",
+      "task_type": "情感分析",
+      "len_A": 2,
+      "len_B": 277,
+      "human": "A",
+      "judge": "平手",
+      "agree": false,
+      "reason": "两者都准确，表达方式不同",
+      "constraint": "题目无硬性约束",
+      "analysis": "A 简洁直接；B 解释更详细",
+      "identical": false
+    },
+    {
+      "id": "E03",
+      "task_type": "情感分析",
+      "len_A": 2,
+      "len_B": 258,
+      "human": "A",
+      "judge": "平手",
+      "agree": false,
+      "reason": "A和B都符合事实准确性，且表达质量相当",
+      "constraint": "题目无硬性约束",
+      "analysis": "A与B都准确回答了情绪判断，B额外解释了原因，但未改变判断",
+      "identical": false
+    },
+    {
+      "id": "C01",
+      "task_type": "代码生成",
+      "len_A": 170,
+      "len_B": 1151,
+      "human": "A",
+      "judge": "A",
+      "agree": true,
+      "reason": "A 满足题目要求的简洁性，B 虽然更完整但超出了要求",
+      "constraint": "题目有硬性约束，包括函数定义和判断逻辑",
+      "analysis": "A 简洁直接，满足题目要求；B 逻辑更完整，包含输入验证和优化，但超出了题目要求的简洁性",
+      "identical": false
+    },
+    {
+      "id": "C02",
+      "task_type": "代码生成",
+      "len_A": 92,
+      "len_B": 838,
+      "human": "A",
+      "judge": "A",
+      "agree": true,
+      "reason": "A 代码简洁且满足硬性约束，B 虽然详细但违反了简洁性原则。",
+      "constraint": "题目有硬性约束，要求用 Python 写函数计算平均值，列表为空时返回0",
+      "analysis": "A 直接使用 sum/len 计算平均值，简洁高效；B 提供了详细的解释和步骤，但代码冗余。",
+      "identical": false
+    },
+    {
+      "id": "W01",
+      "task_type": "创意写作",
+      "len_A": 15,
+      "len_B": 20,
+      "human": "A",
+      "judge": "A",
+      "agree": true,
+      "reason": "A符合字数要求，更简洁有力",
+      "constraint": "题目有硬性约束，字数限制在15字以内",
+      "analysis": "A回答简洁明了，直接点明奶茶新店开业，且突出奶茶的特点；B回答虽然也吸引人，但字数超过15字，违反了硬性约束",
+      "identical": false
+    },
+    {
+      "id": "W02",
+      "task_type": "创意写作",
+      "len_A": 60,
+      "len_B": 144,
+      "human": "A",
+      "judge": "A",
+      "agree": true,
+      "reason": "A 的故事更符合题目要求，转折自然且主题明确",
+      "constraint": "题目有硬性约束，字数和句数限制",
+      "analysis": "A 在情节转折和坚持主题上更符合要求；B 虽然有转折，但主题偏离了坚持，且最后一句与主题相悖",
+      "identical": false
+    },
+    {
+      "id": "K04",
+      "task_type": "事实问答",
+      "len_A": 2,
+      "len_B": 497,
+      "human": "A",
+      "judge": "A",
+      "agree": true,
+      "reason": "A 满足字数限制且直接回答了问题",
+      "constraint": "题目有硬性约束，要求回答城市名称",
+      "analysis": "A 直接回答了问题，B 提供了额外信息但违反了字数限制",
+      "identical": false
+    },
+    {
+      "id": "R04",
+      "task_type": "逻辑推理",
+      "len_A": 1,
+      "len_B": 843,
+      "human": "平手",
+      "judge": "A",
+      "agree": false,
+      "reason": "A回答符合题目条件，B回答分析过程冗长且结论错误",
+      "constraint": "题目有硬性约束，字数未超过限制",
+      "analysis": "A回答直接给出结论，B回答详细分析过程，但最终结论与题目条件矛盾",
+      "identical": false
+    },
+    {
+      "id": "S03",
+      "task_type": "文本摘要",
+      "len_A": 16,
+      "len_B": 55,
+      "human": "A",
+      "judge": "B",
+      "agree": false,
+      "reason": "B 回答更完整且相关性强",
+      "constraint": "题目有硬性约束，要求概括性回答",
+      "analysis": "B 回答更全面，涵盖了节省成本、提升灵活性、沟通效率降低和界限模糊等要点；A 回答较为简略，只提到了常态化、利弊并存，缺乏具体内容",
+      "identical": false
+    },
+    {
+      "id": "C03",
+      "task_type": "代码生成",
+      "len_A": 55,
+      "len_B": 1523,
+      "human": "A",
+      "judge": "A",
+      "agree": true,
+      "reason": "A符合题目要求，B超出要求。",
+      "constraint": "题目有硬性约束，要求用Python写一个函数，把字符串反转。",
+      "analysis": "A直接给出函数实现，简洁明了；B虽然提供了更多实现方法，但题目只要求一个函数，B超出了题目要求。",
+      "identical": false
+    },
+    {
+      "id": "W03",
+      "task_type": "创意写作",
+      "len_A": 32,
+      "len_B": 37,
+      "human": "A",
+      "judge": "A",
+      "agree": true,
+      "reason": "A表达更简洁，符合要求",
+      "constraint": "50字内、体现细心和爱学习",
+      "analysis": "A和B都符合字数要求，A简洁明了，B稍显冗余",
+      "identical": false
+    }
+  ],
+  "cache_stats": {
+    "entries": 101,
+    "file": "data\\out\\judge_cache.json"
+  }
+}
