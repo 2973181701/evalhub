@@ -105,7 +105,38 @@ node backend/server.js                       # JSON 模式，无需数据库
 | **模型对比** | 只在两次都跑过的题上比，数据集版本不同直接判不可比，差值方向固定 B−A |
 | **LLM-as-Judge** | 五维打分 + A/B 偏好判定，严格 JSON、版本化缓存、5xx/429 分类重试；返回两两 Cohen κ 与三方 Fleiss κ |
 | **盲标队列** | 120 组 A/B、8 种失败模式、位置随机化、按题目切分留出集；界面屏蔽设计意图与分组 |
+| **指标注册中心** | Rubric 不可变版本化、自定义维度与权重、质量门禁（不达标自动阻断）；口径统一正是「中台」与「工具」的分界 |
 | **报告** | 五维均值、按题型归因、P50/P90 延迟、失败条目、Markdown 导出 |
+
+---
+
+## 四之二、指标注册中心与质量门禁
+
+评测维度和阈值不再写死在代码里，而是注册成**不可变版本**的口径（改口径 = 新增 version，
+旧版本永久保留，可随时切回）。这正是「指标口径统一」——同一份分数在不同口径下结论可复算。
+
+```bash
+npm run rubric:seed        # 注册默认五维口径（幂等）
+```
+
+```
+GET  /api/rubrics                     列出所有口径与版本
+GET  /api/rubrics/:key                当前 active 口径
+POST /api/rubrics                     注册新版本（admin）
+POST /api/rubrics/gate                质量门禁（evaluator）
+POST /api/rubrics/:key/activate       切回历史版本（admin）
+```
+
+门禁是无状态计算，不落库，可直接接进 CI：
+
+```bash
+curl -X POST localhost:3000/api/rubrics/gate -H 'Content-Type: application/json'   -d '{"key":"evalhub-core","scores":[{"total":3.88,"accuracy":2.92,"safety":4.97}]}'
+# → {"pass":true,...} 或 {"pass":false,"reasons":["维度 safety 均值 3.35 < 门槛 4"]}
+```
+
+校验规则在注册时强制执行：维度权重和必须为 1、门槛不得越界、未知维度拒绝；
+`content_hash` 相同的内容不重复建版本。门禁计算是纯函数，38 项单测覆盖压线边界、
+维度独立门槛、低分样本占比与空样本拒绝。
 
 ---
 

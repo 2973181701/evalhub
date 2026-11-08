@@ -48,6 +48,14 @@ import { login, listUsers, createUser, getUserById } from './users.js';
 import { compareRuns } from './compare.js';
 import { scoreAnswer, preferPair, judgeReady, cacheStats, DIMS, DIM_CN } from './judge.js';
 import { listQueue, getPair, submitLabel, stats as labelStats, LabelingError } from './labeling/queue.js';
+import {
+  list as listRubrics,
+  get as getRubric,
+  register as registerRubric,
+  gate as runGate,
+  activate as activateRubric,
+  RubricError,
+} from './rubrics/registry.js';
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -516,6 +524,60 @@ app.post('/api/label-queue/:id/label', requireRole('evaluator'), async (req, res
     ok(res, { record, queue: await labelStats() });
   } catch (e) {
     if (e instanceof LabelingError) return fail(res, e.status, e.message);
+    fail(res, 500, e.message);
+  }
+});
+
+// ─────────────────────────────── 指标注册中心（评测中台） ───────────────────────────────
+
+/** 列出所有口径及其版本，前端可选任意版本做门禁 */
+app.get('/api/rubrics', async (_req, res) => {
+  try {
+    ok(res, await listRubrics());
+  } catch (e) {
+    fail(res, 500, e.message);
+  }
+});
+
+app.get('/api/rubrics/:key', async (req, res) => {
+  try {
+    ok(res, await getRubric(req.params.key, req.query.version));
+  } catch (e) {
+    if (e instanceof RubricError) return fail(res, e.status, e.message);
+    fail(res, 500, e.message);
+  }
+});
+
+/** 注册口径会改变全平台的判定标准，限 admin */
+app.post('/api/rubrics', requireRole('admin'), async (req, res) => {
+  try {
+    const result = await registerRubric(req.body ?? {}, req.user?.email ?? null);
+    ok(res, result);
+  } catch (e) {
+    if (e instanceof RubricError) return fail(res, e.status, e.message);
+    fail(res, 500, e.message);
+  }
+});
+
+/**
+ * 质量门禁：拿一批评测分数判定是否允许「上线」。
+ * 无状态、不落库 —— 同一 rubric + 同一批分数永远得到同一结论，方便 CI 复算。
+ */
+app.post('/api/rubrics/gate', requireRole('evaluator'), async (req, res) => {
+  const { key, version, scores } = req.body ?? {};
+  try {
+    ok(res, await runGate({ key, version, scores }));
+  } catch (e) {
+    if (e instanceof RubricError) return fail(res, e.status, e.message);
+    fail(res, 500, e.message);
+  }
+});
+
+app.post('/api/rubrics/:key/activate', requireRole('admin'), async (req, res) => {
+  try {
+    ok(res, await activateRubric(req.params.key, req.body?.version));
+  } catch (e) {
+    if (e instanceof RubricError) return fail(res, e.status, e.message);
     fail(res, 500, e.message);
   }
 });

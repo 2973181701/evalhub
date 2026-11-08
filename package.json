@@ -13,7 +13,8 @@
     "label:build": "node tools/build_label_queue.mjs",
     "label:heldout": "node tools/eval_judge_heldout.mjs",
     "push:github": "node tools/push_to_github.mjs",
-    "push:github:yes": "node tools/push_to_github.mjs --yes"
+    "push:github:yes": "node tools/push_to_github.mjs --yes",
+    "rubric:seed": "node tools/seed_rubric.mjs"
   },
   "dependencies": {
     "pg": "^8.13.1"
