@@ -47,11 +47,24 @@ function canonical(value) {
   return JSON.stringify(value ?? null);
 }
 
-export function configHash(provider, model, config) {
+export function configHash(provider, model, config, rubricRef = null) {
+  const payload = { provider, model, config };
+  // 口径也是配置的一部分：同参数但换了评分口径，两次结果不该被当成「可复现重跑」
+  if (rubricRef) payload.rubric = { key: rubricRef.key, version: rubricRef.version };
   return crypto
     .createHash('sha256')
-    .update(canonical({ provider, model, config }), 'utf8')
+    .update(canonical(payload), 'utf8')
     .digest('hex');
+}
+
+/** 解析创建任务时生效的口径版本；查不到就返回 null，不猜测、不伪造 */
+async function resolveActiveRubric(requestedKey = null) {
+  const key = String(requestedKey || 'evalhub-core');
+  const { rows } = await query(
+    `SELECT key, version FROM rubrics WHERE key = $1 AND is_active = true LIMIT 1`,
+    [key],
+  );
+  return rows.length ? { key: rows[0].key, version: rows[0].version } : null;
 }
 
 const nowIso = () => new Date().toISOString();
@@ -78,8 +91,10 @@ export async function createRun({ provider = 'local', model, ids, config = {}, a
   }
 
   const effModel = model || (provider === 'glm' ? glmConfig.model : 'engine-local');
-  const hash = configHash(provider, effModel, config);
   const ref = repoRef.datasetRef();
+  // 口径血缘：仅 PG 模式可查；历史 run 保持 NULL，不回填。
+  const rubricRef = pgEnabled() ? await resolveActiveRubric(config?.rubric_key) : null;
+  const hash = configHash(provider, effModel, config, rubricRef);
 
   if (!pgEnabled()) {
     const id = `mem-${++sequence}-${Date.now().toString(36)}`;
@@ -110,10 +125,13 @@ export async function createRun({ provider = 'local', model, ids, config = {}, a
   const actorId = actor?.sub && /^\d+$/.test(String(actor.sub)) ? Number(actor.sub) : null;
 
   const { rows } = await query(
-    `INSERT INTO eval_runs (dataset_id, provider, model, config, config_hash, status, total_items, item_keys, created_by)
-     VALUES ($1, $2, $3, $4::jsonb, $5, 'queued', $6, $7, $8)
-     RETURNING id, status, total_items, created_at`,
-    [ref.id, provider, effModel, JSON.stringify(config), hash, picked.length, picked.map((p) => p.id), actorId],
+    `INSERT INTO eval_runs (dataset_id, provider, model, config, config_hash, status, total_items, item_keys, rubric_key, rubric_version, created_by)
+     VALUES ($1, $2, $3, $4::jsonb, $5, 'queued', $6, $7, $8, $9, $10)
+     RETURNING id, status, total_items, rubric_key, rubric_version, created_at`,
+    [
+      ref.id, provider, effModel, JSON.stringify(config), hash, picked.length,
+      picked.map((p) => p.id), rubricRef?.key ?? null, rubricRef?.version ?? null, actorId,
+    ],
   );
 
   await query(
@@ -138,7 +156,7 @@ export async function listRuns({ limit = 20 } = {}) {
   const { rows } = await query(
     `SELECT id, dataset_id, provider, model, config_hash, status,
             total_items, done_items, failed_items, tokens_in, tokens_out, cost_usd,
-            error, created_at, started_at, finished_at
+            rubric_key, rubric_version, error, created_at, started_at, finished_at
        FROM eval_runs ORDER BY created_at DESC LIMIT $1`,
     [n],
   );
@@ -153,7 +171,7 @@ export async function getRun(id) {
   const { rows } = await query(
     `SELECT id, dataset_id, provider, model, config, config_hash, status,
             total_items, item_keys, done_items, failed_items, tokens_in, tokens_out, cost_usd,
-            error, created_at, started_at, finished_at
+            rubric_key, rubric_version, error, created_at, started_at, finished_at
        FROM eval_runs WHERE id = $1`,
     [id],
   );

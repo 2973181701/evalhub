@@ -18,7 +18,8 @@ const DIMS = ['accuracy', 'completeness', 'logic', 'safety', 'expression'];
 async function loadRun(id) {
   const { rows } = await query(
     `SELECT id, dataset_id, provider, model, config_hash, status,
-            total_items, item_keys, done_items, failed_items, created_at, finished_at
+            total_items, item_keys, done_items, failed_items, created_at, finished_at,
+            rubric_key, rubric_version
        FROM eval_runs WHERE id = $1`,
     [id],
   );
@@ -101,6 +102,25 @@ export async function compareRuns(idA, idB) {
     };
   }
 
+  // 口径血缘：双方都有记录且不同 → 判定不可比；任一方无记录（历史 run）不阻断，
+  // 只在结果里标注 caveat，避免把「没记录」误当成「口径不同」。
+  const rubricLabel = (r) => (r.rubric_key ? `${r.rubric_key}@v${r.rubric_version}` : '未记录');
+  const bothRecorded = Boolean(a.rubric_key && b.rubric_key);
+  const sameRubric = !bothRecorded
+    || (a.rubric_key === b.rubric_key && a.rubric_version === b.rubric_version);
+  const rubricCaveat = bothRecorded
+    ? null
+    : '其中一次任务未记录评分口径（历史 run），结论按数据集相同处理';
+
+  if (!sameRubric) {
+    return {
+      comparable: false,
+      reason: `两次任务使用不同的评分口径（${rubricLabel(a)} vs ${rubricLabel(b)}），分数口径不一致，差值没有意义`,
+      a: meta(a, dsA),
+      b: meta(b, dsB),
+    };
+  }
+
   const [ra, rb] = await Promise.all([loadResults(idA), loadResults(idB)]);
   const common = [...ra.keys()].filter((k) => rb.has(k)).sort();
   const onlyA = [...ra.keys()].filter((k) => !rb.has(k)).sort();
@@ -156,6 +176,7 @@ export async function compareRuns(idA, idB) {
   return {
     comparable: true,
     dataset: { name: dsA.name, version: dsA.version, hash: String(dsA.content_hash).slice(0, 16) },
+    rubric: { a: rubricLabel(a), b: rubricLabel(b), caveat: rubricCaveat },
     overlap: common.length,
     only_a: onlyA,
     only_b: onlyB,

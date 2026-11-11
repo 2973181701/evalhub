@@ -40,6 +40,13 @@ SELECT 'label_batch', b.name, 'label_pair_set', b.name, 'contains',
  GROUP BY b.name, b.content_hash
 
 UNION ALL
+SELECT 'rubric', r.rubric_key || '@v' || r.rubric_version::text,
+       'run', r.id::text, 'scored_by',
+       jsonb_build_object('status', r.status, 'provider', r.provider)
+  FROM eval_runs r
+ WHERE r.rubric_key IS NOT NULL AND r.rubric_version IS NOT NULL
+
+UNION ALL
 SELECT 'label_batch', b.name, 'label_annotation_set', b.name, 'annotated_by',
        jsonb_build_object('human_labels', count(*) FILTER (WHERE a.label_source = 'human'),
                           'fixture_labels', count(*) FILTER (WHERE a.label_source = 'test_fixture'))
@@ -116,14 +123,16 @@ export async function walk(type, id, direction = 'downstream') {
 export function knownGaps() {
   return [
     {
-      gap: 'eval_runs 未记录使用的 rubric 版本',
-      impact: '无法回答「这次评测用的是哪个口径」，口径血缘暂不可追',
-      fix: '给 eval_runs 增加 rubric_key / rubric_version 并在创建任务时写入',
+      gap: '历史 eval_runs 未记录 rubric 版本',
+      impact: '这些 run 没有 scored_by 血缘边；新建任务已自动记录口径版本',
+      fix: '历史数据保持 NULL，不伪造回填；对比时以 caveat 标注',
+      resolved_for_new_records: true,
     },
     {
       gap: 'label_pairs 与 datasets 无外键',
-      impact: '标注队列与 v1 评测集之间的血缘只能靠外部事件登记',
+      impact: '标注队列与评测集之间的血缘只能靠外部事件登记',
       fix: '接入时显式写入 source_dataset 字段',
+      resolved_for_new_records: false,
     },
   ];
 }

@@ -18,6 +18,7 @@
 import './env.js';
 import express from 'express';
 import cors from 'cors';
+import { query } from './db.js';
 import { engineVersion, ENGINE_BUILD, score, validateAnnotation, consistency } from './engine.js';
 import { glmStatus, chat, glmReady, glmConfig } from './glm.js';
 import {
@@ -70,6 +71,12 @@ import {
   history as dqHistory,
   DqError,
 } from './governance/quality.js';
+import {
+  ingest,
+  listBatches,
+  listRejects,
+  IngestError,
+} from './governance/ingest.js';
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -671,6 +678,73 @@ app.get('/api/dq/history', async (req, res) => {
 app.post('/api/dq/seed', requireRole('admin'), async (_req, res) => {
   try {
     ok(res, await seedRules());
+  } catch (e) {
+    fail(res, 500, e.message);
+  }
+});
+
+// ─────────────────────────────── 数据接入与资产目录 ───────────────────────────────
+
+/**
+ * 接入评测集。只接受结构化 rows（不收文件、不收自定义 SQL），
+ * 服务端做 schema 校验与内容哈希去重，产出不可变数据集版本。
+ */
+app.post('/api/ingest/dataset', requireRole('admin'), async (req, res) => {
+  const { name, sourceType, rows, datasetName, dryRun, sourceUri } = req.body ?? {};
+  try {
+    ok(res, await ingest({
+      name, sourceType, rows, datasetName, dryRun, sourceUri,
+    }));
+  } catch (e) {
+    if (e instanceof IngestError) return fail(res, e.status, e.message);
+    fail(res, 500, e.message);
+  }
+});
+
+app.get('/api/ingest/batches', async (req, res) => {
+  try {
+    ok(res, await listBatches(req.query.limit));
+  } catch (e) {
+    fail(res, 500, e.message);
+  }
+});
+
+app.get('/api/ingest/batches/:name/rejects', async (req, res) => {
+  try {
+    ok(res, await listRejects(req.params.name));
+  } catch (e) {
+    fail(res, 500, e.message);
+  }
+});
+
+/** 统一资产目录：数据集 / 口径 / 标注批次 / 评测任务 / 接入批次 */
+app.get('/api/catalog', async (req, res) => {
+  const type = req.query.type || null;
+  const q = req.query.q || null;
+  const limit = Math.max(1, Math.min(200, Number(req.query.limit) || 50));
+  try {
+    const { rows } = await query(
+      `SELECT * FROM v_asset_catalog
+        WHERE ($1::text IS NULL OR asset_type = $1)
+          AND ($2::text IS NULL
+               OR asset_key ILIKE '%' || $2 || '%'
+               OR coalesce(description,'') ILIKE '%' || $2 || '%')
+        ORDER BY created_at DESC LIMIT $3`,
+      [type, q, limit],
+    );
+    ok(res, rows);
+  } catch (e) {
+    fail(res, 500, e.message);
+  }
+});
+
+app.get('/api/catalog/summary', async (_req, res) => {
+  try {
+    const { rows } = await query(
+      `SELECT asset_type, count(*)::int AS n, max(created_at) AS last_updated
+         FROM v_asset_catalog GROUP BY asset_type ORDER BY asset_type`,
+    );
+    ok(res, rows);
   } catch (e) {
     fail(res, 500, e.message);
   }

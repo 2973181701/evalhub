@@ -100,6 +100,55 @@
         </details>
       </section>
 
+      <!-- 资产目录 -->
+      <section class="card">
+        <div class="card-head">
+          <span class="card-title">资产目录（{{ assets.length }} 项）</span>
+          <div class="btn-row">
+            <input v-model="assetType" class="field-input" placeholder="类型筛选" style="max-width:130px" />
+            <input v-model="assetQuery" class="field-input" placeholder="关键词" style="max-width:150px" />
+            <button class="btn" :disabled="busy" @click="loadAssets">查询</button>
+          </div>
+        </div>
+        <div class="card-note" style="margin-bottom:8px">
+          {{ assetSummary.map(x => x.asset_type + ' ' + x.n).join(' · ') }}
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr class="muted" style="text-align:left">
+            <th style="padding:5px">类型</th><th>资产</th><th>条目</th><th>状态</th><th>创建时间</th>
+          </tr></thead>
+          <tbody>
+            <tr v-for="a in assets" :key="a.asset_type + a.asset_key">
+              <td class="mono" style="padding:5px">{{ a.asset_type }}</td>
+              <td class="mono">{{ a.asset_key }}</td>
+              <td class="muted">{{ a.item_count }}</td>
+              <td class="muted">{{ a.status }}</td>
+              <td class="muted">{{ String(a.created_at).slice(0, 19) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- 接入批次 -->
+      <section class="card">
+        <div class="card-head"><span class="card-title">数据接入批次（{{ batches.length }}）</span></div>
+        <div v-for="b in batches" :key="b.name" style="margin-top:6px">
+          <div class="mono" style="font-size:13px">
+            {{ b.name }} · {{ b.status }} · 接受 {{ b.accepted_count }}/{{ b.row_count }}
+            <span v-if="b.target_dataset"> → {{ b.target_dataset }}@v{{ b.target_version }}</span>
+          </div>
+          <button v-if="b.rejected_count" class="btn" style="margin-top:4px" @click="toggleRejects(b.name)">
+            {{ rejectOpen === b.name ? '收起' : '查看' }}拒绝明细（{{ b.rejected_count }}）
+          </button>
+          <div v-if="rejectOpen === b.name" style="margin-top:6px">
+            <div v-for="r in rejects" :key="r.row_index" class="muted" style="font-size:12.5px">
+              行 {{ r.row_index }}：{{ r.reason }}
+            </div>
+          </div>
+        </div>
+        <div class="card-note" style="margin-top:8px">样例数据均为 synthetic，非真实业务数据。</div>
+      </section>
+
       <!-- 历史 -->
       <section v-if="history.length > 1" class="card">
         <div class="card-head"><span class="card-title">检查历史</span></div>
@@ -128,18 +177,44 @@ const walkType = ref('dataset');
 const walkId = ref('evalhub-core@v1');
 const walkDir = ref('downstream');
 const walked = ref(null);
+const assets = ref([]);
+const assetSummary = ref([]);
+const assetType = ref('');
+const assetQuery = ref('');
+const batches = ref([]);
+const rejectOpen = ref('');
+const rejects = ref([]);
+
+async function loadAssets() {
+  try {
+    assets.value = await api.catalog({ type: assetType.value || undefined, q: assetQuery.value || undefined, limit: 50 });
+    assetSummary.value = await api.catalogSummary();
+  } catch (e) { error.value = friendlyError(e); }
+}
+
+async function toggleRejects(name) {
+  if (rejectOpen.value === name) { rejectOpen.value = ''; return; }
+  try {
+    rejects.value = await api.ingestRejects(name);
+    rejectOpen.value = name;
+  } catch (e) { error.value = friendlyError(e); }
+}
 
 async function refresh() {
   loading.value = true;
   error.value = '';
   try {
-    const [r, rs, g, h] = await Promise.all([
+    const [r, rs, g, h, a, sum, b] = await Promise.all([
       api.dqReport(), api.dqRules(), api.lineageGraph(), api.dqHistory(10),
+      api.catalog({ limit: 50 }), api.catalogSummary(), api.ingestBatches(),
     ]);
     report.value = r;
     rules.value = rs;
     graph.value = g;
     history.value = h;
+    assets.value = a;
+    assetSummary.value = sum;
+    batches.value = b;
   } catch (e) {
     error.value = friendlyError(e);
   } finally {

@@ -231,6 +231,44 @@ npm run governance:seed   # 注册规则 + 登记事件 + 重建血缘 + 跑一�
 
 ---
 
+## 六之三、口径血缘、数据接入与资产目录
+
+**口径血缘（补齐上一轮的已知缺口）**：`eval_runs` 新增 `rubric_key` / `rubric_version`，
+创建任务时自动记录当时生效的口径；血缘重建后生成 `rubric → run` 的 `scored_by` 边。
+口径版本也进入 `config_hash`，因此「同参数不同口径」不会被当成可复现重跑；
+模型对比时若两次 run 口径不同，直接判 `not_comparable`。历史 run 保持 NULL，**不伪造回填**，
+对比时以 `caveat` 标注而不阻断。
+
+**数据接入**：`tools/ingest_dataset.mjs` 把 JSON/CSV 评测集接成**不可变数据集版本**：
+
+```bash
+npm run ingest:dataset -- --file data/inbox/sample_prompts.json --name demo-01 --dry-run
+npm run ingest:dataset -- --file data/inbox/sample_prompts.json --name demo-01
+npm run ingest:dataset -- --list
+npm run ingest:dataset -- --rejects demo-01
+```
+
+- schema 校验：id 格式与唯一性、题型白名单、prompt 非空与长度上限
+- `content_hash` 去重：同内容只建一次版本，重跑返回 `skipped`
+- 拒绝行留原因与原始 payload，不静默丢弃；批次与血缘事件一并落库
+- 样例数据全部标注 **`synthetic`**，不是真实业务数据，报告中明确写出来源
+
+实测：8 行样例 → 接受 6 / 拒绝 2（重复 id、白名单外题型），产出 `ingested@v1`；
+换批次名重跑同内容 → `skipped`；HTTP 接入另一批 1 条 → `ingested@v2`。
+
+**资产目录**：`v_asset_catalog` 是派生视图，把数据集 / 口径 / 标注批次 / 评测任务 /
+接入批次统一成可检索资产（不存第二份真相源）。
+
+```
+GET /api/catalog?type=&q=&limit=      GET /api/catalog/summary
+POST /api/ingest/dataset              GET /api/ingest/batches
+GET /api/ingest/batches/:name/rejects
+```
+
+实测目录 5 类资产；全文检索 `ingest` 命中数据集与接入批次。前端「数据治理」页可直接查看。
+
+---
+
 ## 七、诚实边界
 
 - **Judge 尚未达到可替代人工的水平**：κ 0.6341 刚过常用门槛 0.6，但 CI 宽、样本小。

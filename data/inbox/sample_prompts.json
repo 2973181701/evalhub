@@ -1,0 +1,10 @@
+[
+  {"_synthetic": true, "id": "IN01", "task_type": "事实问答", "prompt": "国际标准书号 ISBN 由多少位数字组成？", "reference": "13 位"},
+  {"_synthetic": true, "id": "IN02", "task_type": "事实问答", "prompt": "HTTP 协议默认端口是多少？", "reference": "80"},
+  {"_synthetic": true, "id": "IN03", "task_type": "逻辑推理", "prompt": "若 A 大于 B，B 大于 C，A 与 C 谁大？", "reference": "A 大"},
+  {"_synthetic": true, "id": "IN04", "task_type": "情感分析", "prompt": "判断情绪（正面/负面/中性）：「排队两小时才办完，太折腾了。」", "reference": "负面"},
+  {"_synthetic": true, "id": "IN05", "task_type": "文本摘要", "prompt": "请用一句话概括：定期备份可防数据丢失，但同机房备份无法抵御火灾等物理灾害。", "reference": "备份防丢失，同机房仍有物理风险"},
+  {"_synthetic": true, "id": "IN06", "task_type": "代码生成", "prompt": "用 Python 写一个函数，返回字符串中元音字母的个数。", "reference": "sum(1 for c in s.lower() if c in 'aeiou')"},
+  {"_synthetic": true, "id": "IN03", "task_type": "逻辑推理", "prompt": "故意重复 id，用于演示接入校验的拒绝记录。", "reference": "应被拒绝"},
+  {"_synthetic": true, "id": "IN07", "task_type": "不存在的题型", "prompt": "故意使用白名单外题型，用于演示拒绝记录。", "reference": "应被拒绝"}
+]

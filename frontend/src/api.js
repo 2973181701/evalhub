@@ -105,4 +105,16 @@ export const api = {
   dqRun: () => post('/api/dq/run'),
   dqReport: () => get('/api/dq/report'),
   dqHistory: (limit = 10) => get(`/api/dq/history?limit=${limit}`),
+
+  // 数据中台：资产目录 + 接入批次
+  catalog: ({ type, q, limit } = {}) => {
+    const qs = new URLSearchParams();
+    if (type) qs.set('type', type);
+    if (q) qs.set('q', q);
+    if (limit) qs.set('limit', String(limit));
+    return get(`/api/catalog?${qs}`);
+  },
+  catalogSummary: () => get('/api/catalog/summary'),
+  ingestBatches: () => get('/api/ingest/batches'),
+  ingestRejects: (name) => get(`/api/ingest/batches/${encodeURIComponent(name)}/rejects`),
 };
