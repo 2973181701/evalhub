@@ -20,6 +20,7 @@
  */
 
 import fs from 'node:fs';
+import { runInTenant } from '../backend/tenant/cli.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { goldStandard } from '../backend/labeling/queue.js';
@@ -132,7 +133,7 @@ async function main() {
   await closePool();
 }
 
-main().catch(async (e) => {
+runInTenant(main).catch(async (e) => {
   console.error('评估失败：', e);
   await closePool().catch(() => {});
   process.exit(1);

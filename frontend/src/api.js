@@ -8,6 +8,20 @@
  */
 
 const TOKEN_KEY = 'evalhub.token';
+// 当前选择的业务线。只影响请求头，真正的权限由后端按令牌+成员身份判定，
+// 前端改这个值越不了权（改动无效只会拿到 403）。
+const TENANT_KEY = 'evalhub.tenant';
+
+export function getTenant() {
+  try { return localStorage.getItem(TENANT_KEY) || ''; } catch { return ''; }
+}
+
+export function setTenant(slug) {
+  try {
+    if (slug) localStorage.setItem(TENANT_KEY, slug);
+    else localStorage.removeItem(TENANT_KEY);
+  } catch { /* ignore */ }
+}
 
 export function getToken() {
   try {
@@ -30,6 +44,8 @@ async function request(path, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
+  const tenant = getTenant();
+  if (tenant) headers['X-Tenant'] = tenant;
 
   const res = await fetch(path, { ...options, headers });
   let body;
@@ -81,6 +97,9 @@ export const api = {
   compareRuns: (a, b) => get(`/api/runs/${a}/compare/${b}`),
 
   // LLM-as-Judge
+  tenants: () => get('/api/tenants'),
+  tenantSummary: (slug) => get(`/api/tenants/${slug}/summary`),
+
   judgeStatus: () => get('/api/judge/status'),
   judgeScore: (payload) => post('/api/judge/score', payload),
   judgePreferences: (limit) => post('/api/judge/preferences', limit ? { limit } : {}),

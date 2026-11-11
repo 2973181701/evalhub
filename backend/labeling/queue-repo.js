@@ -7,12 +7,15 @@
  */
 
 import { query, withTransaction } from '../db.js';
+import { tenantId } from '../tenant/context.js';
 
 const BLIND_COLUMNS = 'id, task_type, prompt, answer_a, answer_b, batch_id, created_at, labeled';
 
 export async function listQueue({ limit = 20, offset = 0, onlyPending = true, taskType = null }) {
   const where = [];
-  const params = [];
+  // 租户条件永远排第一个，后续占位符继续用 params.length 推，不会错位
+  const params = [tenantId()];
+  where.push('tenant_id = $1');
   if (onlyPending) where.push('NOT labeled');
   if (taskType) {
     params.push(taskType);
@@ -28,19 +31,23 @@ export async function listQueue({ limit = 20, offset = 0, onlyPending = true, ta
 
 export async function findBlind(id) {
   const { rows } = await query(
-    `SELECT ${BLIND_COLUMNS} FROM v_label_queue WHERE id = $1`,
-    [id],
+    `SELECT ${BLIND_COLUMNS} FROM v_label_queue WHERE id = $1 AND tenant_id = $2`,
+    [id, tenantId()],
   );
   return rows[0] ?? null;
 }
 
 export async function findPairExists(id) {
-  const { rows } = await query('SELECT id FROM label_pairs WHERE id = $1', [id]);
+  const { rows } = await query('SELECT id FROM label_pairs WHERE id = $1 AND tenant_id = $2', [id, tenantId()]);
   return Boolean(rows.length);
 }
 
 export async function upsertLabel({ id, annotatorKey, choice, reason, confidence, labelSource }) {
   return withTransaction(async (client) => {
+    const tid = tenantId();
+    // 先确认这道题属于本业务线；不属于就不写，避免「标了别家的题」这种脏数据
+    const owned = await client.query('SELECT 1 FROM label_pairs WHERE id = $1 AND tenant_id = $2', [id, tid]);
+    if (!owned.rows.length) return null;
     await client.query(
       `INSERT INTO label_annotations (pair_id, annotator_key, choice, reason, confidence, label_source)
        VALUES ($1, $2, $3, $4, $5, $6)
@@ -53,9 +60,9 @@ export async function upsertLabel({ id, annotatorKey, choice, reason, confidence
       [id, annotatorKey, choice, reason ?? null, confidence ?? null, labelSource],
     );
     await client.query(
-      `INSERT INTO audit_logs (actor_id, action, target, detail)
-       VALUES (NULL, 'label.submit', $1, $2)`,
-      [id, JSON.stringify({ choice, annotator: annotatorKey, label_source: labelSource })],
+      `INSERT INTO audit_logs (tenant_id, actor_id, action, target, detail)
+       VALUES ($1, NULL, 'label.submit', $2, $3)`,
+      [tid, id, JSON.stringify({ choice, annotator: annotatorKey, label_source: labelSource })],
     );
     const { rows } = await client.query(
       'SELECT id, pair_id, choice, confidence, label_source, created_at FROM label_annotations WHERE pair_id=$1 AND annotator_key=$2',
@@ -66,23 +73,30 @@ export async function upsertLabel({ id, annotatorKey, choice, reason, confidence
 }
 
 export async function queueStats() {
+  const tid = tenantId();
   const { rows } = await query(`
     SELECT
-      (SELECT count(*) FROM label_pairs) AS total,
-      (SELECT count(*) FROM label_pairs p WHERE EXISTS (SELECT 1 FROM label_annotations a WHERE a.pair_id=p.id)) AS labeled,
-      (SELECT count(*) FROM label_annotations WHERE label_source='human') AS human_labels,
-      (SELECT count(*) FROM label_annotations WHERE label_source='test_fixture') AS fixture_labels,
-      (SELECT count(*) FROM label_pairs WHERE split='test') AS test_pairs,
-      (SELECT count(*) FROM label_pairs WHERE split='train') AS train_pairs
-  `);
+      (SELECT count(*) FROM label_pairs WHERE tenant_id=$1) AS total,
+      (SELECT count(*) FROM label_pairs p WHERE p.tenant_id=$1
+         AND EXISTS (SELECT 1 FROM label_annotations a WHERE a.pair_id=p.id)) AS labeled,
+      (SELECT count(*) FROM label_annotations a JOIN label_pairs p ON p.id=a.pair_id
+        WHERE p.tenant_id=$1 AND a.label_source='human') AS human_labels,
+      (SELECT count(*) FROM label_annotations a JOIN label_pairs p ON p.id=a.pair_id
+        WHERE p.tenant_id=$1 AND a.label_source='test_fixture') AS fixture_labels,
+      (SELECT count(*) FROM label_pairs WHERE tenant_id=$1 AND split='test') AS test_pairs,
+      (SELECT count(*) FROM label_pairs WHERE tenant_id=$1 AND split='train') AS train_pairs
+  `, [tid]);
   const byTask = await query(`
     SELECT p.task_type, count(*) AS n,
            count(*) FILTER (WHERE EXISTS (SELECT 1 FROM label_annotations a WHERE a.pair_id=p.id)) AS labeled
-      FROM label_pairs p GROUP BY p.task_type ORDER BY p.task_type
-  `);
+      FROM label_pairs p WHERE p.tenant_id=$1 GROUP BY p.task_type ORDER BY p.task_type
+  `, [tid]);
   const byChoice = await query(`
-    SELECT choice, count(*) AS n FROM label_annotations WHERE label_source='human' GROUP BY choice ORDER BY choice
-  `);
+    SELECT a.choice, count(*) AS n
+      FROM label_annotations a JOIN label_pairs p ON p.id=a.pair_id
+     WHERE p.tenant_id=$1 AND a.label_source='human'
+     GROUP BY a.choice ORDER BY a.choice
+  `, [tid]);
   return {
     ...rows[0],
     by_task_type: byTask.rows,
@@ -96,8 +110,8 @@ export async function queueStats() {
  * 严格过滤 label_source='human'，并按 split 限定；绝不把设计意图当标签返回。
  */
 export async function goldStandard({ split = null, onlyHuman = true } = {}) {
-  const params = [];
-  const where = [];
+  const params = [tenantId()];
+  const where = ['p.tenant_id = $1'];
   if (onlyHuman) where.push("a.label_source = 'human'");
   if (split) {
     params.push(split);

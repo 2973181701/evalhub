@@ -19,6 +19,8 @@ import crypto from 'node:crypto';
 import { score } from '../engine.js';
 import { chat, glmReady, glmConfig } from '../glm.js';
 import { pgEnabled, query, withTransaction } from '../db.js';
+import { tenantId, runWithTenant } from '../tenant/context.js';
+import { getTenantById } from '../tenant/repo.js';
 
 const CONCURRENCY = Math.max(1, Number(process.env.EVAL_CONCURRENCY || 1));
 const ITEM_INTERVAL_MS = Number(process.env.EVAL_ITEM_INTERVAL_MS || 0);
@@ -60,9 +62,11 @@ export function configHash(provider, model, config, rubricRef = null) {
 /** 解析创建任务时生效的口径版本；查不到就返回 null，不猜测、不伪造 */
 async function resolveActiveRubric(requestedKey = null) {
   const key = String(requestedKey || 'evalhub-core');
+  // ⚠️ 必须带租户条件：口径是每业务线独立的版本线，
+  // 少了它就会取到「全库第一条 active」，把 A 业务线的口径记到 B 业务线的任务上。
   const { rows } = await query(
-    `SELECT key, version FROM rubrics WHERE key = $1 AND is_active = true LIMIT 1`,
-    [key],
+    `SELECT key, version FROM rubrics WHERE tenant_id = $2 AND key = $1 AND is_active = true LIMIT 1`,
+    [key, tenantId()],
   );
   return rows.length ? { key: rows[0].key, version: rows[0].version } : null;
 }
@@ -124,20 +128,21 @@ export async function createRun({ provider = 'local', model, ids, config = {}, a
 
   const actorId = actor?.sub && /^\d+$/.test(String(actor.sub)) ? Number(actor.sub) : null;
 
+  const tid = tenantId();   // 缺上下文会直接抛错，不会写成「无归属任务」
   const { rows } = await query(
-    `INSERT INTO eval_runs (dataset_id, provider, model, config, config_hash, status, total_items, item_keys, rubric_key, rubric_version, created_by)
-     VALUES ($1, $2, $3, $4::jsonb, $5, 'queued', $6, $7, $8, $9, $10)
+    `INSERT INTO eval_runs (tenant_id, dataset_id, provider, model, config, config_hash, status, total_items, item_keys, rubric_key, rubric_version, created_by)
+     VALUES ($1, $2, $3, $4, $5::jsonb, $6, 'queued', $7, $8, $9, $10, $11)
      RETURNING id, status, total_items, rubric_key, rubric_version, created_at`,
     [
-      ref.id, provider, effModel, JSON.stringify(config), hash, picked.length,
+      tid, ref.id, provider, effModel, JSON.stringify(config), hash, picked.length,
       picked.map((p) => p.id), rubricRef?.key ?? null, rubricRef?.version ?? null, actorId,
     ],
   );
 
   await query(
-    `INSERT INTO audit_logs (actor_id, action, target, detail)
-     VALUES ($1, 'run.create', $2, $3::jsonb)`,
-    [actorId, String(rows[0].id), JSON.stringify({ provider, model: effModel, items: picked.length })],
+    `INSERT INTO audit_logs (tenant_id, actor_id, action, target, detail)
+     VALUES ($1, $2, 'run.create', $3, $4::jsonb)`,
+    [tid, actorId, String(rows[0].id), JSON.stringify({ provider, model: effModel, items: picked.length })],
   );
   enqueue(rows[0].id);
   return { ...rows[0], storage: 'postgres' };
@@ -157,8 +162,8 @@ export async function listRuns({ limit = 20 } = {}) {
     `SELECT id, dataset_id, provider, model, config_hash, status,
             total_items, done_items, failed_items, tokens_in, tokens_out, cost_usd,
             rubric_key, rubric_version, error, created_at, started_at, finished_at
-       FROM eval_runs ORDER BY created_at DESC LIMIT $1`,
-    [n],
+       FROM eval_runs WHERE tenant_id = $2 ORDER BY created_at DESC LIMIT $1`,
+    [n, tenantId()],
   );
   return rows;
 }
@@ -172,8 +177,8 @@ export async function getRun(id) {
     `SELECT id, dataset_id, provider, model, config, config_hash, status,
             total_items, item_keys, done_items, failed_items, tokens_in, tokens_out, cost_usd,
             rubric_key, rubric_version, error, created_at, started_at, finished_at
-       FROM eval_runs WHERE id = $1`,
-    [id],
+       FROM eval_runs WHERE id = $1 AND tenant_id = $2`,
+    [id, tenantId()],
   );
   return rows[0] ?? null;
 }
@@ -184,9 +189,12 @@ export async function getResults(id) {
     return mem.results.get(id) ?? [];
   }
   const { rows } = await query(
-    `SELECT item_key, scores, total, output, latency_ms, tokens_in, tokens_out, cost_usd, error
-       FROM eval_results WHERE run_id = $1 ORDER BY id`,
-    [id],
+    `SELECT e.item_key, e.scores, e.total, e.output, e.latency_ms, e.tokens_in, e.tokens_out, e.cost_usd, e.error
+       FROM eval_results e
+       JOIN eval_runs r ON r.id = e.run_id
+      WHERE e.run_id = $1 AND r.tenant_id = $2
+      ORDER BY e.id`,
+    [id, tenantId()],
   );
   return rows.map((r) => ({
     id: r.item_key,
@@ -211,9 +219,9 @@ export async function cancelRun(id) {
   const { rows } = await query(
     `UPDATE eval_runs
         SET status = 'canceled', finished_at = now()
-      WHERE id = $1 AND status IN ('queued', 'running')
+      WHERE id = $1 AND tenant_id = $2 AND status IN ('queued', 'running')
       RETURNING id, status, done_items, total_items`,
-    [id],
+    [id, tenantId()],
   );
   return rows[0] ?? null;
 }
@@ -280,13 +288,26 @@ async function tick() {
     }
     if (!id) return;
     active += 1;
-    runOne(id, { claimed: true })
+    withRunTenant(id, () => runOne(id, { claimed: true }))
       .catch((e) => console.error('[EvalHub] 评测任务异常：', e))
       .finally(() => {
         active -= 1;
         setImmediate(tick);
       });
   }
+}
+
+/**
+ * 后台任务不在 HTTP 请求里，必须显式建立租户上下文。
+ * 拿不到租户就抛错 —— 这条任务会失败，但绝不会用别的业务线的数据继续跑。
+ */
+async function withRunTenant(id, fn) {
+  const { rows } = await query('SELECT tenant_id FROM eval_runs WHERE id = $1', [id]);
+  const tid = rows[0]?.tenant_id;
+  if (!tid) throw new Error(`评测任务 ${id} 缺少租户归属，拒绝执行`);
+  const tenant = await getTenantById(tid);
+  if (!tenant) throw new Error(`评测任务 ${id} 指向的租户 ${tid} 不存在，拒绝执行`);
+  return runWithTenant({ ...tenant, role: 'evaluator', source: 'worker', enforced: true }, fn);
 }
 
 /** PostgreSQL 模式下启动轮询器（JSON 模式仍用内存队列） */

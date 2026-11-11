@@ -12,6 +12,7 @@
  */
 
 import fs from 'node:fs';
+import { runInTenant } from '../backend/tenant/cli.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ingest, listBatches, listRejects, IngestError } from '../backend/governance/ingest.js';
@@ -72,7 +73,7 @@ async function main() {
   await closePool();
 }
 
-main().catch(async (e) => {
+runInTenant(main).catch(async (e) => {
   console.error('接入失败：', e.message);
   await closePool().catch(() => {});
   process.exit(1);

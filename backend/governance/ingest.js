@@ -14,6 +14,7 @@
 
 import crypto from 'node:crypto';
 import { query, withTransaction } from '../db.js';
+import { tenantId } from '../tenant/context.js';
 
 export const ALLOWED_TASK_TYPES = [
   '事实问答', '逻辑推理', '文本摘要', '情感分析', '代码生成', '创意写作',
@@ -111,8 +112,8 @@ export async function listBatches(limit = 20) {
   const { rows } = await query(
     `SELECT name, source_type, source_uri, content_hash, row_count, accepted_count,
             rejected_count, status, target_dataset, target_version, created_at
-       FROM ingestion_batches ORDER BY id DESC LIMIT $1`,
-    [Math.max(1, Math.min(100, Number(limit) || 20))],
+       FROM ingestion_batches WHERE tenant_id = $2 ORDER BY id DESC LIMIT $1`,
+    [Math.max(1, Math.min(100, Number(limit) || 20)), tenantId()],
   );
   return rows;
 }
@@ -122,8 +123,8 @@ export async function listRejects(name) {
     `SELECT r.row_index, r.reason, r.payload
        FROM ingestion_rejects r
        JOIN ingestion_batches b ON b.id = r.batch_id
-      WHERE b.name = $1 ORDER BY r.row_index`,
-    [name],
+      WHERE b.name = $1 AND b.tenant_id = $2 ORDER BY r.row_index`,
+    [name, tenantId()],
   );
   return rows;
 }
@@ -168,8 +169,8 @@ export async function ingest({
   // 幂等：同内容已提交过 → 直接返回已有批次，不重复建版本
   const dup = await query(
     `SELECT name, target_dataset, target_version, status FROM ingestion_batches
-      WHERE content_hash = $1 AND status = 'committed' LIMIT 1`,
-    [hash],
+      WHERE content_hash = $1 AND status = 'committed' AND tenant_id = $2 LIMIT 1`,
+    [hash, tenantId()],
   );
   if (dup.rows.length) {
     return {
@@ -179,9 +180,12 @@ export async function ingest({
   }
 
   const result = await withTransaction(async (client) => {
-    // 同内容的数据集直接复用，不新建版本
+    const tid = tenantId();
+    // 同内容的数据集直接复用，不新建版本。必须限定本租户 ——
+    // 否则 A 业务线接入的内容会被 B 业务线「复用」，等于跨租户读数据。
     const existing = await client.query(
-      'SELECT id, name, version FROM datasets WHERE content_hash = $1 LIMIT 1', [hash],
+      'SELECT id, name, version FROM datasets WHERE content_hash = $1 AND tenant_id = $2 LIMIT 1',
+      [hash, tid],
     );
     let datasetId; let datasetVersion; let finalName; let reused = false;
 
@@ -192,16 +196,16 @@ export async function ingest({
       reused = true;
     } else {
       const v = await client.query(
-        'SELECT coalesce(max(version), 0) + 1 AS next_version FROM datasets WHERE name = $1',
-        [datasetName],
+        'SELECT coalesce(max(version), 0) + 1 AS next_version FROM datasets WHERE name = $1 AND tenant_id = $2',
+        [datasetName, tid],
       );
       datasetVersion = Number(v.rows[0].next_version);
       finalName = datasetName;
       const ins = await client.query(
-        `INSERT INTO datasets (name, version, content_hash, task_types, item_count, created_by, note)
-         VALUES ($1,$2,$3,$4::text[],$5,'ingest', $6) RETURNING id`,
+        `INSERT INTO datasets (tenant_id, name, version, content_hash, task_types, item_count, created_by, note)
+         VALUES ($1,$2,$3,$4,$5::text[],$6,'ingest', $7) RETURNING id`,
         [
-          datasetName, datasetVersion, hash,
+          tid, datasetName, datasetVersion, hash,
           [...new Set(accepted.map((r) => r.task_type))],
           accepted.length,
           `来源 ${uri}（synthetic 样例数据，非真实业务数据）`,
@@ -220,12 +224,12 @@ export async function ingest({
 
     const batch = await client.query(
       `INSERT INTO ingestion_batches
-         (name, source_type, source_uri, content_hash, row_count, accepted_count,
+         (tenant_id, name, source_type, source_uri, content_hash, row_count, accepted_count,
           rejected_count, status, target_dataset, target_version, report, note)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'committed',$8,$9,$10::jsonb,$11)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'committed',$9,$10,$11::jsonb,$12)
        RETURNING id, created_at`,
       [
-        batchName, sourceType, uri, hash, base.row_count, accepted.length, rejects.length,
+        tid, batchName, sourceType, uri, hash, base.row_count, accepted.length, rejects.length,
         finalName, datasetVersion,
         JSON.stringify({ reused_existing_dataset: reused, task_types: [...new Set(accepted.map((r) => r.task_type))] }),
         '样例评测集接入，数据均标注 synthetic',
@@ -250,9 +254,9 @@ export async function ingest({
     );
 
     await client.query(
-      `INSERT INTO audit_logs (actor_id, action, target, detail)
-       VALUES (NULL, 'ingest.commit', $1, $2::jsonb)`,
-      [batchName, JSON.stringify({ accepted: accepted.length, rejected: rejects.length, dataset: `${finalName}@v${datasetVersion}` })],
+      `INSERT INTO audit_logs (tenant_id, actor_id, action, target, detail)
+       VALUES ($1, NULL, 'ingest.commit', $2, $3::jsonb)`,
+      [tid, batchName, JSON.stringify({ accepted: accepted.length, rejected: rejects.length, dataset: `${finalName}@v${datasetVersion}` })],
     );
 
     return {

@@ -9,9 +9,12 @@
  *   1. 只在**两边都跑过的题**上比较。题集不同还硬比均值，等于拿苹果比橘子。
  *   2. 数据集版本不同则标记 not_comparable —— 题都不一样了，差值没有意义。
  *   3. 差值统一用「B - A」，正数表示 B 更好。方向写死在返回值里，前端不再自己算。
+ *   4. 两次任务必须属于同一业务线。跨租户的 run 一律当「不存在」返回 404，
+ *      不返回 403 —— 403 会泄漏「这个 id 确实存在，只是不属于你」。
  */
 
 import { query, pgEnabled } from './db.js';
+import { tenantId } from './tenant/context.js';
 
 const DIMS = ['accuracy', 'completeness', 'logic', 'safety', 'expression'];
 
@@ -20,8 +23,8 @@ async function loadRun(id) {
     `SELECT id, dataset_id, provider, model, config_hash, status,
             total_items, item_keys, done_items, failed_items, created_at, finished_at,
             rubric_key, rubric_version
-       FROM eval_runs WHERE id = $1`,
-    [id],
+       FROM eval_runs WHERE id = $1 AND tenant_id = $2`,
+    [id, tenantId()],
   );
   return rows[0] ?? null;
 }

@@ -84,9 +84,14 @@ export function verifyPassword(password, stored) {
 
 // ─────────────────────────── 令牌 ───────────────────────────
 
-export function signToken({ id, email, role }, ttlSeconds = Number(process.env.EVALHUB_TOKEN_TTL_SECONDS || 28800)) {
+export function signToken(
+  { id, email, role, tenantId = null, tenantSlug = null },
+  ttlSeconds = Number(process.env.EVALHUB_TOKEN_TTL_SECONDS || 28800),
+) {
   const now = Math.floor(Date.now() / 1000);
-  const payload = { sub: String(id), email, role, iat: now, exp: now + ttlSeconds };
+  // tid 是「该用户在该业务线的角色」对应的租户；role 也是该租户内的角色，
+  // 不是全局角色 —— 同一个人在不同业务线的权限可以不同。
+  const payload = { sub: String(id), email, role, tid: tenantId, tslug: tenantSlug, iat: now, exp: now + ttlSeconds };
   const head = b64u(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
   const body = b64u(JSON.stringify(payload));
   const sig = b64u(crypto.createHmac('sha256', secret()).update(`${head}.${body}`).digest());
@@ -138,15 +143,19 @@ export function requireRole(minRole = 'evaluator', { allowWhenDisabled = true } 
         error: '未认证：请在 Authorization: Bearer <token> 中携带令牌',
       });
     }
+    // 多租户：权限按「当前业务线内的角色」判定。
+    // 中间件在切换业务线时会用成员角色覆盖令牌里的角色，这里必须优先用它 ——
+    // 否则带着 A 业务线的 admin 令牌去访问 B 业务线，会拿到 A 的角色继续当管理员。
+    const effectiveRole = req.tenant?.enforced ? (req.tenant.role ?? payload.role) : payload.role;
     const need = ROLE_RANK[minRole] ?? 2;
-    const got = ROLE_RANK[payload.role] ?? 0;
+    const got = ROLE_RANK[effectiveRole] ?? 0;
     if (got < need) {
       return res.status(403).json({
         ok: false,
-        error: `权限不足：需要 ${minRole} 及以上，当前 ${payload.role}`,
+        error: `权限不足：需要 ${minRole} 及以上，当前 ${effectiveRole}`,
       });
     }
-    req.user = payload;
+    req.user = { ...payload, role: effectiveRole };
     next();
   };
 }

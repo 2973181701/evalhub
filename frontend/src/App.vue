@@ -2,6 +2,7 @@
 import { onMounted, ref, computed } from 'vue';
 import { api, getToken, setToken } from './api.js';
 import { authState, needLogin } from './authState.js';
+import { getTenant, setTenant } from './api.js';
 import EvalBoard from './views/EvalBoard.vue';
 import RunsView from './views/RunsView.vue';
 import AnnotateView from './views/AnnotateView.vue';
@@ -24,6 +25,16 @@ const TABS = [
 const active = ref('eval');
 const health = ref(null);
 const healthError = ref('');
+// 业务线：来自健康检查（后端按令牌解析出的真实上下文），不是前端自说自话
+const tenantSlug = ref(getTenant());
+const memberships = ref([]);
+
+/** 切换业务线：写本地偏好后整页刷新，保证所有视图重新按新租户取数 */
+function switchTenant(slug) {
+  if (slug === (tenantSlug.value || '')) return;
+  setTenant(slug);
+  location.reload();
+}
 
 const current = computed(() => {
   if (active.value === 'login') return LoginView;
@@ -62,6 +73,8 @@ async function loadAuth() {
   if (authState.enabled && getToken()) {
     try {
       authState.user = await api.me();
+      memberships.value = authState.user?.memberships ?? [];
+      if (authState.user?.tenant?.slug) tenantSlug.value = authState.user.tenant.slug;
     } catch {
       authState.user = null;
       setToken('');
@@ -72,12 +85,21 @@ async function loadAuth() {
 
 function onLoggedIn(u) {
   authState.user = u;
+  memberships.value = u?.memberships ?? [];
+  // 登录返回的 tenant 是后端选定的业务线；前端记下来，后续请求带上
+  if (u?.tenant?.slug) {
+    setTenant(u.tenant.slug);
+    tenantSlug.value = u.tenant.slug;
+  }
+  loadHealth();
   switchTab('runs');
 }
 
 function logout() {
   setToken('');
+  setTenant('');
   authState.user = null;
+  memberships.value = [];
   switchTab('eval');
 }
 
@@ -128,6 +150,23 @@ onMounted(() => {
         <button v-if="authState.user" class="btn sm ghost" @click="logout">退出</button>
         <button v-else class="btn sm" @click="switchTab('login')">登录</button>
       </template>
+
+      <span v-if="health?.tenant" class="pill gray" :title="`业务线 ${health.tenant.slug}（${health.tenant.source}）`">
+        业务线 · {{ health.tenant.slug }}
+        <template v-if="!health.tenant.enforced">（未强制）</template>
+      </span>
+
+      <select
+        v-if="memberships.length > 1"
+        class="field-input"
+        style="max-width: 150px"
+        :value="tenantSlug || ''"
+        @change="switchTenant($event.target.value)"
+      >
+        <option v-for="m in memberships" :key="m.slug" :value="m.slug">
+          {{ m.name }}（{{ m.role }}）
+        </option>
+      </select>
 
       <span v-if="healthError" class="pill off"><i class="dot"></i>后端未连接</span>
     </div>

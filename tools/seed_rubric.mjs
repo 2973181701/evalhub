@@ -12,6 +12,7 @@
  */
 
 import { register } from '../backend/rubrics/registry.js';
+import { runInTenant } from '../backend/tenant/cli.js';
 import { closePool } from '../backend/db.js';
 
 const SPEC = {
@@ -46,7 +47,7 @@ async function main() {
   await closePool();
 }
 
-main().catch(async (e) => {
+runInTenant(main).catch(async (e) => {
   console.error('注册失败：', e.message);
   await closePool().catch(() => {});
   process.exit(1);

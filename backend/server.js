@@ -45,7 +45,13 @@ import {
   startWorker,
 } from './jobs/runs.js';
 import { authEnabled, authStatus, requireRole, signToken } from './auth.js';
-import { login, listUsers, createUser, getUserById } from './users.js';
+import { tenantMiddleware, invalidateTenantCache, platformOnly } from './tenant/middleware.js';
+import { tenantInfo, tenantId, currentTenant, DEFAULT_TENANT_SLUG } from './tenant/context.js';
+import {
+  listTenants, createTenant, listMemberships, assignMember, removeMember,
+  getTenantBySlug, tenantSummary, TenantError,
+} from './tenant/repo.js';
+import { login, listUsers, createUser, getUserById, findUserByEmail } from './users.js';
 import { compareRuns } from './compare.js';
 import { scoreAnswer, preferPair, judgeReady, cacheStats, DIMS, DIM_CN } from './judge.js';
 import { listQueue, getPair, submitLabel, stats as labelStats, LabelingError } from './labeling/queue.js';
@@ -86,6 +92,10 @@ const HOST = process.env.HOST || '127.0.0.1';
 app.use(cors());
 app.use(express.json({ limit: '8mb' }));
 
+// 租户解析必须在所有业务路由之前：任何 scoped 查询都依赖这个上下文，
+// 缺上下文时租户查询会直接抛错（fail-closed），不会退化成「查全库」。
+app.use(tenantMiddleware());
+
 /** 统一响应壳：成功 {ok:true,data}，失败 {ok:false,error} */
 const ok = (res, data) => res.json({ ok: true, data });
 const fail = (res, code, error) => res.status(code).json({ ok: false, error });
@@ -98,6 +108,7 @@ app.get('/api/health', (_req, res) => {
     engine_version: engineVersion(),
     engine_build: ENGINE_BUILD,
     storage: storageInfo(),
+    tenant: tenantInfo(),
     auth: authStatus(),
     queue: queueStats(),
     glm: glmStatus(),
@@ -268,16 +279,19 @@ app.post('/api/export', requireRole('viewer'), (req, res) => {
 
 /** 登录换令牌。口令校验失败与用户不存在返回同一错误，避免账号枚举。 */
 app.post('/api/auth/login', async (req, res) => {
-  const { email, password } = req.body ?? {};
+  const { email, password, tenant: tenantSlug } = req.body ?? {};
   if (!email || !password) return fail(res, 400, 'email 与 password 必填');
   try {
-    const user = await login(email, password);
-    const t = signToken(user);
+    const { user, tenant, role, memberships } = await login(email, password, { tenantSlug });
+    // 令牌里的 role 是该租户内的角色，不是平台角色 —— 同一个人在不同业务线可以不同权
+    const t = signToken({ ...user, role, tenantId: tenant.id, tenantSlug: tenant.slug });
     ok(res, {
       token: t.token,
       token_type: 'Bearer',
       expires_in: t.expires_in,
-      user: { id: user.id, email: user.email, role: user.role, display_name: user.display_name },
+      user: { id: user.id, email: user.email, role, display_name: user.display_name },
+      tenant,
+      memberships: memberships.map((m) => ({ slug: m.slug, name: m.name, role: m.role })),
     });
   } catch (e) {
     fail(res, e.status || 500, e.message);
@@ -289,14 +303,23 @@ app.get('/api/auth/me', requireRole('viewer'), async (req, res) => {
   try {
     const u = await getUserById(req.user.sub);
     if (!u || !u.is_active) return fail(res, 401, '账号不存在或已停用');
-    ok(res, u);
+    const memberships = await listMemberships(u.id);
+    ok(res, {
+      ...u,
+      role: req.tenant?.role ?? u.role,   // 该业务线内的角色
+      tenant: tenantInfo(),
+      memberships: memberships.map((m) => ({ slug: m.slug, name: m.name, role: m.role })),
+    });
   } catch (e) {
     fail(res, 500, e.message);
   }
 });
 
 /** 鉴权是否开启——前端据此决定要不要显示登录框 */
-app.get('/api/auth/status', (_req, res) => ok(res, authStatus()));
+app.get('/api/auth/status', (req, res) => ok(res, {
+  ...authStatus(),
+  tenant: { default: DEFAULT_TENANT_SLUG, enforced: Boolean(req.tenant?.enforced) },
+}));
 
 /** 用户管理（仅 admin） */
 app.get('/api/users', requireRole('admin'), async (_req, res, next) => {
@@ -606,7 +629,7 @@ app.post('/api/rubrics/:key/activate', requireRole('admin'), async (req, res) =>
 // ─────────────────────────────── 数据中台：血缘 + 质量 ───────────────────────────────
 
 /** 全量血缘图：派生边 + 外部事件边，并附当前追不到的缺口 */
-app.get('/api/lineage/graph', async (_req, res) => {
+app.get('/api/lineage/graph', platformOnly(), requireRole('admin'), async (_req, res) => {
   try {
     ok(res, await lineageGraph());
   } catch (e) {
@@ -615,7 +638,7 @@ app.get('/api/lineage/graph', async (_req, res) => {
 });
 
 /** 上游/下游追溯。id 里可能含 @ 或 /，一律走 query 而非路径参数 */
-app.get('/api/lineage/walk', async (req, res) => {
+app.get('/api/lineage/walk', platformOnly(), requireRole('admin'), async (req, res) => {
   const { type, id, direction = 'downstream' } = req.query;
   if (!type || !id) return fail(res, 400, 'type 与 id 必填');
   if (!['upstream', 'downstream'].includes(direction)) {
@@ -629,7 +652,7 @@ app.get('/api/lineage/walk', async (req, res) => {
 });
 
 /** 派生边可随时重建；重建是幂等的，不清空外部事件边 */
-app.post('/api/lineage/rebuild', requireRole('admin'), async (_req, res) => {
+app.post('/api/lineage/rebuild', platformOnly(), requireRole('admin'), async (_req, res) => {
   try {
     const events = await seedEvents();
     ok(res, { ...(await rebuildLineage()), external_events: events });
@@ -638,7 +661,7 @@ app.post('/api/lineage/rebuild', requireRole('admin'), async (_req, res) => {
   }
 });
 
-app.get('/api/dq/rules', async (_req, res) => {
+app.get('/api/dq/rules', platformOnly(), requireRole('admin'), async (_req, res) => {
   try {
     ok(res, await listRules());
   } catch (e) {
@@ -647,7 +670,7 @@ app.get('/api/dq/rules', async (_req, res) => {
 });
 
 /** 执行质量检查会写库，限 evaluator；规则 SQL 只来自服务端注册 */
-app.post('/api/dq/run', requireRole('evaluator'), async (_req, res) => {
+app.post('/api/dq/run', platformOnly(), requireRole('admin'), async (_req, res) => {
   try {
     ok(res, await runChecks());
   } catch (e) {
@@ -656,7 +679,7 @@ app.post('/api/dq/run', requireRole('evaluator'), async (_req, res) => {
   }
 });
 
-app.get('/api/dq/report', async (_req, res) => {
+app.get('/api/dq/report', platformOnly(), requireRole('admin'), async (_req, res) => {
   try {
     const report = await latestReport();
     if (!report) return fail(res, 404, '尚未执行过质量检查');
@@ -666,7 +689,7 @@ app.get('/api/dq/report', async (_req, res) => {
   }
 });
 
-app.get('/api/dq/history', async (req, res) => {
+app.get('/api/dq/history', platformOnly(), requireRole('admin'), async (req, res) => {
   try {
     ok(res, await dqHistory(req.query.limit));
   } catch (e) {
@@ -675,7 +698,7 @@ app.get('/api/dq/history', async (req, res) => {
 });
 
 /** 注册内置规则（幂等），供部署脚本调用；不放开客户端自定义 SQL */
-app.post('/api/dq/seed', requireRole('admin'), async (_req, res) => {
+app.post('/api/dq/seed', platformOnly(), requireRole('admin'), async (_req, res) => {
   try {
     ok(res, await seedRules());
   } catch (e) {
@@ -725,12 +748,13 @@ app.get('/api/catalog', async (req, res) => {
   try {
     const { rows } = await query(
       `SELECT * FROM v_asset_catalog
-        WHERE ($1::text IS NULL OR asset_type = $1)
+        WHERE (tenant_id IS NULL OR tenant_id = $4)
+          AND ($1::text IS NULL OR asset_type = $1)
           AND ($2::text IS NULL
                OR asset_key ILIKE '%' || $2 || '%'
                OR coalesce(description,'') ILIKE '%' || $2 || '%')
         ORDER BY created_at DESC LIMIT $3`,
-      [type, q, limit],
+      [type, q, limit, tenantId()],
     );
     ok(res, rows);
   } catch (e) {
@@ -742,11 +766,95 @@ app.get('/api/catalog/summary', async (_req, res) => {
   try {
     const { rows } = await query(
       `SELECT asset_type, count(*)::int AS n, max(created_at) AS last_updated
-         FROM v_asset_catalog GROUP BY asset_type ORDER BY asset_type`,
+         FROM v_asset_catalog
+        WHERE tenant_id IS NULL OR tenant_id = $1
+        GROUP BY asset_type ORDER BY asset_type`,
+      [tenantId()],
     );
     ok(res, rows);
   } catch (e) {
     fail(res, 500, e.message);
+  }
+});
+
+// ─────────────────────────────── 业务线（租户） ───────────────────────────────
+//
+// 权限口径：
+//   - 列表：鉴权开启时只返回自己所属的业务线；鉴权关闭（本地演示）返回全部
+//   - 新建：需要当前业务线的 admin；创建者自动成为新业务线 admin
+//   - 成员管理：需要该业务线的 admin
+
+app.get('/api/tenants', async (req, res) => {
+  try {
+    const all = await listTenants();
+    if (!authEnabled()) return ok(res, all);
+    const mine = await listMemberships(Number(req.user?.sub ?? 0));
+    const mineIds = new Set(mine.map((m) => m.tenant_id));
+    ok(res, all.filter((t) => mineIds.has(t.id)));
+  } catch (e) {
+    fail(res, e.status || 500, e.message);
+  }
+});
+
+app.get('/api/tenants/:slug/summary', async (req, res) => {
+  try {
+    const t = await getTenantBySlug(req.params.slug);
+    if (!t) return fail(res, 404, `业务线 ${req.params.slug} 不存在`);
+    // 只能看自己所属业务线的规模；否则 404（不泄漏该业务线是否存在）
+    const ctx = currentTenant();
+    if (ctx?.enforced && ctx.id !== t.id) return fail(res, 404, `业务线 ${req.params.slug} 不存在`);
+    ok(res, { ...t, assets: await tenantSummary(t.id) });
+  } catch (e) {
+    fail(res, e.status || 500, e.message);
+  }
+});
+
+app.post('/api/tenants', requireRole('admin'), async (req, res) => {
+  const { slug, name, description, clone_rubrics: cloneRubrics } = req.body ?? {};
+  try {
+    const actorId = req.user?.sub && /^\d+$/.test(String(req.user.sub)) ? Number(req.user.sub) : null;
+    const t = await createTenant({
+      slug, name, description,
+      cloneRubrics: cloneRubrics !== false,
+      actorId,
+    });
+    invalidateTenantCache();
+    ok(res, t);
+  } catch (e) {
+    fail(res, e.status || 500, e.message);
+  }
+});
+
+app.post('/api/tenants/:slug/members', requireRole('admin'), async (req, res) => {
+  const { email, role = 'evaluator' } = req.body ?? {};
+  if (!email) return fail(res, 400, 'email 必填');
+  try {
+    const t = await getTenantBySlug(req.params.slug);
+    if (!t) return fail(res, 404, `业务线 ${req.params.slug} 不存在`);
+    // 只能管理自己当前业务线的成员：admin 权限是业务线内的，不是全平台的
+    if (req.tenant?.enforced && req.tenant.id !== t.id) {
+      return fail(res, 403, '只能管理当前业务线的成员');
+    }
+    const u = await findUserByEmail(email);
+    if (!u) return fail(res, 404, `用户 ${email} 不存在，请先创建账号`);
+    ok(res, await assignMember({ userId: u.id, tenantId: t.id, role }));
+  } catch (e) {
+    fail(res, e.status || 500, e.message);
+  }
+});
+
+app.delete('/api/tenants/:slug/members/:userId', requireRole('admin'), async (req, res) => {
+  try {
+    const t = await getTenantBySlug(req.params.slug);
+    if (!t) return fail(res, 404, `业务线 ${req.params.slug} 不存在`);
+    if (req.tenant?.enforced && req.tenant.id !== t.id) {
+      return fail(res, 403, '只能管理当前业务线的成员');
+    }
+    const removed = await removeMember({ userId: Number(req.params.userId), tenantId: t.id });
+    if (!removed) return fail(res, 404, '该用户不是此业务线成员');
+    ok(res, { removed: true });
+  } catch (e) {
+    fail(res, e.status || 500, e.message);
   }
 });
 
