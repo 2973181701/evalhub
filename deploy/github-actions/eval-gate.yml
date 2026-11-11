@@ -1,0 +1,58 @@
+# ⚠ 这是**样例**，不是生效的流水线。
+#
+# 为什么不直接放在 .github/workflows/：当前的 fine-grained PAT 只授权了 Contents 读写，
+# 没有 Workflows 权限，GitHub 会拒绝创建 .github/workflows/* 下的文件（HTTP 403）。
+# 要用的话：复制到 .github/workflows/eval-gate.yml，并用有 Workflows 权限的 token 推送。
+#
+# 评测质量门禁：模型 / prompt 改动后自动跑评测，不达标就阻断合并。
+#
+# 需要两个仓库 secret：
+#   EVALHUB_BASE    平台地址，如 https://eval.example.com
+#   EVALHUB_API_KEY 服务化密钥（在「数据治理之外」的密钥管理里创建，role=evaluator 即可）
+#
+# 退出码语义（脚本已区分，这里直接透传）：
+#   0 通过 / 2 低于口径阈值 / 3 相对基线回退超限 / 1 执行错误
+name: eval-gate
+
+on:
+  pull_request:
+    paths:
+      - 'prompts/**'
+      - 'backend/glm.js'
+      - 'configs/**'
+  workflow_dispatch:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # 全量题集：样本太少时门禁会拒绝出结论（小样本噪声会放大失败率）
+      - name: 评测门禁（全量 20 题，允许回退 0.05）
+        env:
+          EVALHUB_BASE: ${{ secrets.EVALHUB_BASE }}
+          EVALHUB_API_KEY: ${{ secrets.EVALHUB_API_KEY }}
+        run: |
+          node tools/gate_check.mjs \
+            --provider "${{ vars.EVAL_PROVIDER || 'glm' }}" \
+            --rubric evalhub-core \
+            --baseline latest \
+            --max-regress 0.05
+
+      - name: 上传门禁结果
+        if: always()
+        env:
+          EVALHUB_BASE: ${{ secrets.EVALHUB_BASE }}
+          EVALHUB_API_KEY: ${{ secrets.EVALHUB_API_KEY }}
+        run: |
+          node tools/gate_check.mjs --json > gate-report.json || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-gate-report
+          path: gate-report.json

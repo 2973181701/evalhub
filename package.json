@@ -19,7 +19,11 @@
     "ingest:dataset": "node tools/ingest_dataset.mjs",
     "tenant:list": "node tools/tenant.mjs --list",
     "tenant:create": "node tools/tenant.mjs",
-    "tenant:member": "node tools/tenant.mjs"
+    "tenant:member": "node tools/tenant.mjs",
+    "gate": "node tools/gate_check.mjs",
+    "apikey:list": "node tools/api-key.mjs --list",
+    "apikey:create": "node tools/api-key.mjs",
+    "apikey:revoke": "node tools/api-key.mjs"
   },
   "dependencies": {
     "pg": "^8.13.1"

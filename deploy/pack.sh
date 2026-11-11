@@ -29,7 +29,7 @@ tar -czf "$OUT" \
   --exclude='*.log' \
   --exclude='*.bak' \
   --exclude='data/out' \
-  backend core data db deploy frontend tools test reports package.json
+  backend core data db deploy frontend tools test reports sdk .github package.json
 
 echo "已生成 $(du -h "$OUT" | cut -f1)  $OUT"
 echo "包含 core/_build：$(tar -tzf "$OUT" | grep -c 'core/_build') 个文件"

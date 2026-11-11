@@ -135,6 +135,21 @@ export function requireRole(minRole = 'evaluator', { allowWhenDisabled = true } 
       if (allowWhenDisabled) return next();
       return res.status(503).json({ ok: false, error: '鉴权未启用（EVALHUB_AUTH），该接口拒绝服务' });
     }
+    // 服务化 API Key 已在租户中间件校验过，这里直接用它解析出的角色，
+    // 不再尝试当成 JWT 解析（那只会得到 null 并误报 401）。
+    if (req.tenant?.source === 'api-key') {
+      const effectiveRole = req.tenant.role;
+      const needK = ROLE_RANK[minRole] ?? 2;
+      if ((ROLE_RANK[effectiveRole] ?? 0) < needK) {
+        return res.status(403).json({
+          ok: false,
+          error: `权限不足：需要 ${minRole} 及以上，当前 ${effectiveRole}（API Key）`,
+        });
+      }
+      req.user = { ...(req.user ?? {}), role: effectiveRole };
+      return next();
+    }
+
     const token = bearer(req);
     const payload = token ? verifyToken(token) : null;
     if (!payload) {

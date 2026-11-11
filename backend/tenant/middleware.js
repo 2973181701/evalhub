@@ -19,6 +19,7 @@ import { bearer, verifyToken, authEnabled } from '../auth.js';
 import { pgEnabled } from '../db.js';
 import { runWithTenant, DEFAULT_TENANT_SLUG } from './context.js';
 import { getTenantBySlug, getTenantById, resolveMembership, defaultTenant } from './repo.js';
+import { looksLikeApiKey, verifyApiKey } from '../apikeys.js';
 
 const TTL_MS = 30_000;
 const cache = new Map(); // key → { value, at }
@@ -64,7 +65,35 @@ export async function resolveTenantContext(req) {
   }
 
   const enabled = authEnabled();
-  const payload = enabled ? verifyToken(bearer(req) || '') : null;
+  const raw = bearer(req) || '';
+
+  // ── 服务化 API Key（机器调用方）───────────────────────────────────────
+  // 必须在 JWT 之前判断：密钥不是 JWT，交给 verifyToken 只会得到 null。
+  if (enabled && looksLikeApiKey(raw)) {
+    const verified = await verifyApiKey(raw);
+    if (!verified) {
+      const e = new Error('API Key 无效或已撤销');
+      e.status = 401;
+      throw e;
+    }
+    // 密钥只能在自己的业务线内动作，带 X-Tenant 切别的业务线一律拒绝
+    if (headerSlug && headerSlug !== verified.tenant.slug) {
+      const e = new Error(`该 API Key 只属于业务线 ${verified.tenant.slug}，不能操作 ${headerSlug}`);
+      e.status = 403;
+      throw e;
+    }
+    return {
+      ...verified.tenant,
+      role: verified.role,
+      source: 'api-key',
+      enforced: true,
+      // 审计里要能看出「是哪个密钥干的」，因此把名称写进 actor
+      actor: { sub: null, email: `apikey:${verified.key.name}`, role: verified.role, api_key_id: verified.key.id },
+      apiKey: verified.key,
+    };
+  }
+
+  const payload = enabled ? verifyToken(raw) : null;
 
   // ── 未认证 / 鉴权关闭 ────────────────────────────────────────────────
   if (!payload) {

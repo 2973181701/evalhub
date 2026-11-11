@@ -46,6 +46,9 @@ import {
 } from './jobs/runs.js';
 import { authEnabled, authStatus, requireRole, signToken } from './auth.js';
 import { tenantMiddleware, invalidateTenantCache, platformOnly } from './tenant/middleware.js';
+import {
+  createApiKey, listApiKeys, revokeApiKey, ApiKeyError,
+} from './apikeys.js';
 import { tenantInfo, tenantId, currentTenant, DEFAULT_TENANT_SLUG } from './tenant/context.js';
 import {
   listTenants, createTenant, listMemberships, assignMember, removeMember,
@@ -774,6 +777,41 @@ app.get('/api/catalog/summary', async (_req, res) => {
     ok(res, rows);
   } catch (e) {
     fail(res, 500, e.message);
+  }
+});
+
+// ─────────────────────────────── 服务化 API Key ───────────────────────────────
+//
+// 密钥提供「机器调用方」的长期凭据：CI、训练平台、发布系统都靠它接进来。
+// 管理接口要求当前业务线的 admin，且**只能管理本业务线的密钥**（租户来自上下文）。
+
+app.get('/api/api-keys', requireRole('admin'), async (_req, res) => {
+  try {
+    ok(res, await listApiKeys(tenantId()));
+  } catch (e) {
+    fail(res, e.status || 500, e.message);
+  }
+});
+
+app.post('/api/api-keys', requireRole('admin'), async (req, res) => {
+  const { name, role = 'evaluator', description } = req.body ?? {};
+  try {
+    const actorId = req.user?.sub && /^\d+$/.test(String(req.user.sub)) ? Number(req.user.sub) : null;
+    const created = await createApiKey({ tenantId: tenantId(), name, role, description, actorId });
+    ok(res, created);
+  } catch (e) {
+    fail(res, e instanceof ApiKeyError ? e.status : (e.status || 500), e.message);
+  }
+});
+
+app.delete('/api/api-keys/:id', requireRole('admin'), async (req, res) => {
+  try {
+    const actorId = req.user?.sub && /^\d+$/.test(String(req.user.sub)) ? Number(req.user.sub) : null;
+    const row = await revokeApiKey({ tenantId: tenantId(), id: Number(req.params.id), actorId });
+    if (!row) return fail(res, 404, '密钥不存在、已撤销或不属于当前业务线');
+    ok(res, row);
+  } catch (e) {
+    fail(res, e.status || 500, e.message);
   }
 });
 

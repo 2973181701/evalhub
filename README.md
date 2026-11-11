@@ -105,6 +105,7 @@ node backend/server.js                       # JSON 模式，无需数据库
 | **模型对比** | 只在两次都跑过的题上比，数据集版本不同直接判不可比，差值方向固定 B−A |
 | **LLM-as-Judge** | 五维打分 + A/B 偏好判定，严格 JSON、版本化缓存、5xx/429 分类重试；返回两两 Cohen κ 与三方 Fleiss κ |
 | **盲标队列** | 120 组 A/B、8 种失败模式、位置随机化、按题目切分留出集；界面屏蔽设计意图与分组 |
+| **服务化** | API Key（哈希存储 / 绑租户+角色 / 可撤销）+ 零依赖 SDK + CI 质量门禁（退出码区分不达标与回退） |
 | **多租户隔离** | 业务线级数据隔离 + 每业务线角色；基线共享、工作区私有；越权实测 404/403 |
 | **指标注册中心** | Rubric 不可变版本化、自定义维度与权重、质量门禁（不达标自动阻断）；口径统一正是「中台」与「工具」的分界 |
 | **报告** | 五维均值、按题型归因、P50/P90 延迟、失败条目、Markdown 导出 |
@@ -332,6 +333,82 @@ npm run tenant:list
 npm run tenant:create -- --create risk-dept --name "风控业务线"
 npm run tenant:member -- --add-member risk-dept --email someone@x.com --role evaluator
 ```
+
+---
+
+## 六之五、服务化：API Key、SDK 与 CI 门禁
+
+一个平台有没有被真正使用，看的是**别的系统有没有接进来**。JWT 是给人用的、8 小时过期，
+CI 里没法用；所以补了机器对机器的长期凭据，以及配套的 SDK 和门禁脚本。
+
+**API Key（`ehk_<8位标识>.<secret>`）**
+
+| 设计 | 原因 |
+|---|---|
+| 库里只存 `sha256(明文)` | 库被拖走也拿不到可用密钥；不提供「查看密钥」接口 |
+| 明文只在创建时返回一次 | 和主流云厂商一致，避免「随手存明文」的团队习惯 |
+| 绑定**业务线 + 角色** | 一把 key 只能在一个业务线内动作，不会变成全平台万能钥匙 |
+| 只支持撤销（留时间戳） | 撤销即时生效；`last_used_at` 用来识别僵尸密钥 |
+| 校验失败统一一条错误 | 不区分「不存在 / 已撤销 / secret 错」，避免探测 |
+
+```
+GET    /api/api-keys       列出本业务线密钥（只有前缀，不含 secret）
+POST   /api/api-keys       创建（返回明文一次）
+DELETE /api/api-keys/:id   撤销
+```
+
+实测：`source=api-key` 被正确识别；`evaluator` 密钥注册口径 **403**；
+拿 platform 的密钥带 `X-Tenant: risk-dept` **403**；撤销后同一密钥立刻 **401**。
+
+**SDK（`sdk/evalhub-client.mjs`，零依赖）**
+
+```js
+import { EvalHubClient } from './sdk/evalhub-client.mjs';
+
+const client = new EvalHubClient({
+  baseUrl: 'https://eval.example.com',
+  apiKey: process.env.EVALHUB_API_KEY,
+});
+
+const { run, aggregate } = await client.runAndAggregate({ provider: 'glm' });
+console.log(run.id, aggregate.total, aggregate.dims);
+```
+
+除了薄封装，还做了三件调用方一定会踩的事：`waitRun` 只在 queued/running 时轮询、
+`aggregate` **只统计有分数的行**（把失败条目当 0 会稀释成假低分）、
+`results` 把 `{count, rows}` 信封归一化成数组。
+
+**CI 门禁（`tools/gate_check.mjs`）**
+
+```bash
+EVALHUB_API_KEY=ehk_xxx node tools/gate_check.mjs   --base https://eval.example.com --provider glm   --rubric evalhub-core --baseline latest --max-regress 0.05
+```
+
+| 退出码 | 含义 | 处置 |
+|---:|---|---|
+| 0 | 通过 | 放行 |
+| 2 | 低于口径阈值 | 说明这次改动本身不达标 |
+| 3 | 相对基线回退超限 | 说明是本次改动引入的退化，定位范围小 |
+| 1 | 执行错误 / 样本不足 | 不算通过，也不算失败，要人看 |
+
+两者分开是因为**处置不同**：不达标是「就是差」，回退是「本来能过，现在不如上次」。
+
+**两个必须校准的地方**
+
+1. **样本量**：3 条里 1 条低分就是 33% 失败率，会直接越过 rubric 的失败率上限，
+   把噪声判成退化。所以门禁默认 `--min-samples 10`，不足就**拒绝出结论**而不是硬判。
+2. **阈值必须对着基线校准**：默认口径 v2 设了 `max_fail_rate 25%`，
+   但基线实测是 **35%**（20 题里 7 题低于 3.5 分）——这道门禁上线第一天就会拦下自己的基线，
+   然后被团队关掉。已注册 v3 把上限放到 40%，并在描述里写明「等微调后收紧」。
+   **门槛不是拍脑袋定的，是量出来的。**
+
+示例流水线在 `.github/workflows/eval-gate.yml`（PR 改动 prompts / 模型配置时触发）。
+
+**边界**
+
+- 没有密钥轮换宽限期（新旧并行）、没有按 key 限流、没有 IP 白名单、没有细粒度 scope
+- 门禁只覆盖「单次评测 + 相对基线回退」，没有做多模型 A/B 的显著性检验
+- `gate_check` 的基线对比用的是两侧总分均值，题集不同时不做交集处理（对比接口有做，门禁脚本没调）
 
 ---
 
