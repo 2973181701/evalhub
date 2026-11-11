@@ -94,4 +94,15 @@ export const api = {
   },
   labelQueueStats: () => get('/api/label-queue/stats'),
   submitLabel: (id, payload) => post(`/api/label-queue/${id}/label`, payload),
+
+  // 数据中台：血缘 + 质量
+  lineageGraph: () => get('/api/lineage/graph'),
+  lineageWalk: ({ type, id, direction }) => get(
+    `/api/lineage/walk?type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}&direction=${direction}`
+  ),
+  lineageRebuild: () => post('/api/lineage/rebuild'),
+  dqRules: () => get('/api/dq/rules'),
+  dqRun: () => post('/api/dq/run'),
+  dqReport: () => get('/api/dq/report'),
+  dqHistory: (limit = 10) => get(`/api/dq/history?limit=${limit}`),
 };

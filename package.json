@@ -14,7 +14,8 @@
     "label:heldout": "node tools/eval_judge_heldout.mjs",
     "push:github": "node tools/push_to_github.mjs",
     "push:github:yes": "node tools/push_to_github.mjs --yes",
-    "rubric:seed": "node tools/seed_rubric.mjs"
+    "rubric:seed": "node tools/seed_rubric.mjs",
+    "governance:seed": "node tools/seed_governance.mjs"
   },
   "dependencies": {
     "pg": "^8.13.1"

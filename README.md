@@ -194,6 +194,43 @@ npm run label:heldout                     # 出留出集报告
 
 ---
 
+## 六之二、数据中台：血缘与质量
+
+「怎么评」由评测中台回答，「凭什么信这些数据」由这一层回答。两件事：**血缘**（数据从哪来）与**质量**（数据干不干净）。
+
+**血缘**：`lineage_edges` 是从现有表关系**派生**的边，不是第二份真相源，任何时候都能 `rebuild` 重建；
+`lineage_events` 登记无法推导的跨系统事件（外部题库接入、报告导出），重建时不清理。
+支持上游/下游递归追溯，带环保护。
+
+```
+GET  /api/lineage/graph                         全图 + 已知缺口
+GET  /api/lineage/walk?type=&id=&direction=    上游 / 下游追溯
+POST /api/lineage/rebuild                      重建派生边（幂等）
+```
+
+实测：1 个数据集版本 + 1 次 local 评测 + 20 条结果 + 标注批次 → **9 节点 / 7 边 / 7 种关系**；
+从 `dataset:evalhub-core@v1` 下游可达 run、标注集、报告、结果集（深度 2）。
+
+**诚实缺口**（接口会直接返回，不假装全链路可追）：`eval_runs` 未记录使用的 rubric 版本，
+所以「这次评测用了哪个口径」目前追不到；`label_pairs` 与 `datasets` 无外键。
+
+**质量**：14 条规则注册在 `dq_rules` 表里（12 critical + 2 warning），覆盖唯一性、引用完整性、
+枚举、进度边界、留出集泄漏、口径权重和、新鲜度。规则 SQL 只由服务端 seed，HTTP 不接受自定义 SQL，
+且执行前强制校验为只读 SELECT。
+
+```
+GET  /api/dq/rules     POST /api/dq/run     GET /api/dq/report     GET /api/dq/history
+npm run governance:seed   # 注册规则 + 登记事件 + 重建血缘 + 跑一次检查
+```
+
+实测：12 条 critical 全过，**质量分 100**；2 条 warning 是真实提示（留出集尚无真人标签、近 7 天无新 run）。
+**反向验证**：故意把某次 run 的 `done_items` 改成 999 → 立即被 `run_progress_bounds` 抓到，
+分数降到 91.67 / status=critical；恢复后回到 100。规则不是摆设。
+
+前端「数据治理」页可查看质量分、规则清单、血缘上下游追溯与已知缺口。
+
+---
+
 ## 七、诚实边界
 
 - **Judge 尚未达到可替代人工的水平**：κ 0.6341 刚过常用门槛 0.6，但 CI 宽、样本小。

@@ -8,6 +8,7 @@ import AnnotateView from './views/AnnotateView.vue';
 import ReportView from './views/ReportView.vue';
 import CompareView from './views/CompareView.vue';
 import LabelQueueView from './views/LabelQueueView.vue';
+import GovernanceView from './views/GovernanceView.vue';
 import LoginView from './views/LoginView.vue';
 
 const TABS = [
@@ -16,6 +17,7 @@ const TABS = [
   { key: 'annotate', label: '标注界面', comp: AnnotateView },
   { key: 'compare', label: '模型对比', comp: CompareView },
   { key: 'labelqueue', label: '标注队列', comp: LabelQueueView },
+  { key: 'governance', label: '数据治理', comp: GovernanceView },
   { key: 'report', label: '报告页', comp: ReportView },
 ];
 

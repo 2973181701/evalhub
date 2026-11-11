@@ -56,6 +56,20 @@ import {
   activate as activateRubric,
   RubricError,
 } from './rubrics/registry.js';
+import {
+  rebuild as rebuildLineage,
+  graph as lineageGraph,
+  walk as lineageWalk,
+  seedEvents,
+} from './governance/lineage.js';
+import {
+  seedRules,
+  listRules,
+  runChecks,
+  latestReport,
+  history as dqHistory,
+  DqError,
+} from './governance/quality.js';
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -578,6 +592,86 @@ app.post('/api/rubrics/:key/activate', requireRole('admin'), async (req, res) =>
     ok(res, await activateRubric(req.params.key, req.body?.version));
   } catch (e) {
     if (e instanceof RubricError) return fail(res, e.status, e.message);
+    fail(res, 500, e.message);
+  }
+});
+
+// ─────────────────────────────── 数据中台：血缘 + 质量 ───────────────────────────────
+
+/** 全量血缘图：派生边 + 外部事件边，并附当前追不到的缺口 */
+app.get('/api/lineage/graph', async (_req, res) => {
+  try {
+    ok(res, await lineageGraph());
+  } catch (e) {
+    fail(res, 500, e.message);
+  }
+});
+
+/** 上游/下游追溯。id 里可能含 @ 或 /，一律走 query 而非路径参数 */
+app.get('/api/lineage/walk', async (req, res) => {
+  const { type, id, direction = 'downstream' } = req.query;
+  if (!type || !id) return fail(res, 400, 'type 与 id 必填');
+  if (!['upstream', 'downstream'].includes(direction)) {
+    return fail(res, 400, 'direction 只能是 upstream / downstream');
+  }
+  try {
+    ok(res, await lineageWalk(type, id, direction));
+  } catch (e) {
+    fail(res, 500, e.message);
+  }
+});
+
+/** 派生边可随时重建；重建是幂等的，不清空外部事件边 */
+app.post('/api/lineage/rebuild', requireRole('admin'), async (_req, res) => {
+  try {
+    const events = await seedEvents();
+    ok(res, { ...(await rebuildLineage()), external_events: events });
+  } catch (e) {
+    fail(res, 500, e.message);
+  }
+});
+
+app.get('/api/dq/rules', async (_req, res) => {
+  try {
+    ok(res, await listRules());
+  } catch (e) {
+    fail(res, 500, e.message);
+  }
+});
+
+/** 执行质量检查会写库，限 evaluator；规则 SQL 只来自服务端注册 */
+app.post('/api/dq/run', requireRole('evaluator'), async (_req, res) => {
+  try {
+    ok(res, await runChecks());
+  } catch (e) {
+    if (e instanceof DqError) return fail(res, e.status, e.message);
+    fail(res, 500, e.message);
+  }
+});
+
+app.get('/api/dq/report', async (_req, res) => {
+  try {
+    const report = await latestReport();
+    if (!report) return fail(res, 404, '尚未执行过质量检查');
+    ok(res, report);
+  } catch (e) {
+    fail(res, 500, e.message);
+  }
+});
+
+app.get('/api/dq/history', async (req, res) => {
+  try {
+    ok(res, await dqHistory(req.query.limit));
+  } catch (e) {
+    fail(res, 500, e.message);
+  }
+});
+
+/** 注册内置规则（幂等），供部署脚本调用；不放开客户端自定义 SQL */
+app.post('/api/dq/seed', requireRole('admin'), async (_req, res) => {
+  try {
+    ok(res, await seedRules());
+  } catch (e) {
     fail(res, 500, e.message);
   }
 });
