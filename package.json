@@ -23,7 +23,8 @@
     "gate": "node tools/gate_check.mjs",
     "apikey:list": "node tools/api-key.mjs --list",
     "apikey:create": "node tools/api-key.mjs",
-    "apikey:revoke": "node tools/api-key.mjs"
+    "apikey:revoke": "node tools/api-key.mjs",
+    "apikey:rotate": "node tools/api-key.mjs"
   },
   "dependencies": {
     "pg": "^8.13.1"

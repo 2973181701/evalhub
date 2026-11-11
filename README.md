@@ -360,6 +360,48 @@ DELETE /api/api-keys/:id   撤销
 实测：`source=api-key` 被正确识别；`evaluator` 密钥注册口径 **403**；
 拿 platform 的密钥带 `X-Tenant: risk-dept` **403**；撤销后同一密钥立刻 **401**。
 
+**生命周期：到期与轮换**
+
+| 能力 | 实现 | 为什么这样做 |
+|---|---|---|
+| 到期 | `expires_at`，到期那一刻即失效 | 「下次清理时失效」会让密钥多活一个清理周期 |
+| 轮换 | `POST /api/api-keys/:id/rotate`，旧密钥改名 `name@retired-<id>` 并进入宽限期 | 直接撤销再建新的，调用方在「拿新密钥 → 改配置 → 重新部署」之间必然断流 |
+| 传承 | `rotated_from` 指向旧密钥 | 审计时能追一条密钥的传承链，而不是看到一串孤立记录 |
+| 状态 | `active` / `revoked` / `expired` 三态 | 「已过期」和「已撤销」处理方式不同，混在一起会让运维误判 |
+
+实测：轮换后新旧密钥**同时可用**；`--grace 0` 时旧密钥立刻 401、新密钥立刻 200；
+到期时间设在过去的密钥创建后直接 401，列表显示「已过期」。
+
+**限流：按 key、多副本安全**
+
+```
+api_key_usage(key_id, window_start, count)   -- 固定窗口（按分钟）+ UPSERT 自增
+```
+
+- 计数放数据库而不是进程内存：多副本部署时内存计数各算各的，等于「额度 × 副本数」。
+- **先计数再判断**，被拒绝的请求也占一次额度——否则被限流的客户端可以无限重试而不消耗额度。
+- 响应带 `X-RateLimit-Limit / Remaining / Used`，超限返回 **429 + Retry-After**。
+- 计数保留 2 天，服务每小时清理一次。
+
+实测（配额 3/min）：前 3 次 200，第 4、5 次 429 且 `Retry-After: 40`；
+正常请求返回 `X-RateLimit-Limit: 60 / Remaining: 59`。
+
+**SDK（Node 与 Python，均零依赖）**
+
+Python 版用标准库 `urllib`，因为训练侧、数据侧、DocGuard 业务线都是 Python：
+
+```python
+from evalhub_client import EvalHubClient
+
+client = EvalHubClient(base_url="http://127.0.0.1:3000", api_key=os.environ["EVALHUB_API_KEY"])
+run = client.create_run(provider="glm")
+client.wait_run(run["id"])
+print(client.aggregate(run["id"])["total"])
+```
+
+两个 SDK 的行为约定一致：`wait_run` 只在 queued/running 时轮询、`aggregate` 只统计有分数的行、
+`results` 拆掉 `{count, rows}` 信封。实测 Python 端 3 题跑通、总分 4.067 与 Node 端逐位一致。
+
 **SDK（`sdk/evalhub-client.mjs`，零依赖）**
 
 ```js
@@ -406,7 +448,7 @@ EVALHUB_API_KEY=ehk_xxx node tools/gate_check.mjs   --base https://eval.example.
 
 **边界**
 
-- 没有密钥轮换宽限期（新旧并行）、没有按 key 限流、没有 IP 白名单、没有细粒度 scope
+- 没有 IP 白名单、没有细粒度 scope（一个 key 的权限就是它的 role）；限流是固定窗口，不是滑动窗口/令牌桶，分钟边界会有 2 倍突刺
 - 门禁只覆盖「单次评测 + 相对基线回退」，没有做多模型 A/B 的显著性检验
 - `gate_check` 的基线对比用的是两侧总分均值，题集不同时不做交集处理（对比接口有做，门禁脚本没调）
 

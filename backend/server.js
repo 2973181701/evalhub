@@ -18,7 +18,7 @@
 import './env.js';
 import express from 'express';
 import cors from 'cors';
-import { query } from './db.js';
+import { query, pgEnabled } from './db.js';
 import { engineVersion, ENGINE_BUILD, score, validateAnnotation, consistency } from './engine.js';
 import { glmStatus, chat, glmReady, glmConfig } from './glm.js';
 import {
@@ -47,7 +47,7 @@ import {
 import { authEnabled, authStatus, requireRole, signToken } from './auth.js';
 import { tenantMiddleware, invalidateTenantCache, platformOnly } from './tenant/middleware.js';
 import {
-  createApiKey, listApiKeys, revokeApiKey, ApiKeyError,
+  createApiKey, listApiKeys, revokeApiKey, rotateApiKey, pruneUsage, ApiKeyError,
 } from './apikeys.js';
 import { tenantInfo, tenantId, currentTenant, DEFAULT_TENANT_SLUG } from './tenant/context.js';
 import {
@@ -794,11 +794,35 @@ app.get('/api/api-keys', requireRole('admin'), async (_req, res) => {
 });
 
 app.post('/api/api-keys', requireRole('admin'), async (req, res) => {
-  const { name, role = 'evaluator', description } = req.body ?? {};
+  const {
+    name, role = 'evaluator', description,
+    rate_limit_per_min: rateLimit = null, expires_at: expiresAt = null,
+  } = req.body ?? {};
   try {
     const actorId = req.user?.sub && /^\d+$/.test(String(req.user.sub)) ? Number(req.user.sub) : null;
-    const created = await createApiKey({ tenantId: tenantId(), name, role, description, actorId });
+    const created = await createApiKey({
+      tenantId: tenantId(), name, role, description, actorId,
+      rateLimitPerMin: rateLimit, expiresAt,
+    });
     ok(res, created);
+  } catch (e) {
+    fail(res, e instanceof ApiKeyError ? e.status : (e.status || 500), e.message);
+  }
+});
+
+/**
+ * 轮换：发新密钥接替旧的，旧密钥进入宽限期后自动失效。
+ * 为什么不直接撤销再建新的：调用方要在「拿到新密钥 → 更新配置 → 重新部署」之间
+ * 有一段时间新旧并存，否则必然断流。
+ */
+app.post('/api/api-keys/:id/rotate', requireRole('admin'), async (req, res) => {
+  const { grace_minutes: grace = 30 } = req.body ?? {};
+  try {
+    const actorId = req.user?.sub && /^\d+$/.test(String(req.user.sub)) ? Number(req.user.sub) : null;
+    const out = await rotateApiKey({
+      tenantId: tenantId(), id: Number(req.params.id), graceMinutes: grace, actorId,
+    });
+    ok(res, out);
   } catch (e) {
     fail(res, e instanceof ApiKeyError ? e.status : (e.status || 500), e.message);
   }
@@ -912,6 +936,16 @@ if (recovered.recovered) {
   console.log(`  [队列] 发现 ${recovered.recovered} 个上次未跑完的任务，已标记为 failed`);
 }
 startWorker();
+
+// 限流计数每小时清理一次保留 2 天的窗口，避免表无限增长
+if (pgEnabled()) {
+  const timer = setInterval(() => {
+    pruneUsage()
+      .then((n) => { if (n) console.log(`  [限流] 清理过期计数 ${n} 行`); })
+      .catch(() => {});
+  }, 60 * 60 * 1000);
+  timer.unref?.();
+}
 
 app.listen(PORT, HOST, () => {
   const s = glmStatus();

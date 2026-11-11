@@ -12,7 +12,7 @@
 
 import { closePool } from '../backend/db.js';
 import { getTenantBySlug } from '../backend/tenant/repo.js';
-import { createApiKey, listApiKeys, revokeApiKey } from '../backend/apikeys.js';
+import { createApiKey, listApiKeys, revokeApiKey, rotateApiKey } from '../backend/apikeys.js';
 import { DEFAULT_TENANT_SLUG } from '../backend/tenant/context.js';
 
 const argv = process.argv.slice(2);
@@ -36,10 +36,14 @@ async function main() {
     console.log(`业务线 ${slug}（${tenant.name}）`);
     for (const k of rows) {
       const used = k.last_used_at ? new Date(k.last_used_at).toISOString().slice(0, 19).replace('T', ' ') : '从未使用';
+      const exp = k.expires_at ? new Date(k.expires_at).toISOString().slice(0, 16).replace('T', ' ') : '不过期';
+      const statusCn = { active: '有效', revoked: '已撤销', expired: '已过期' }[k.status] ?? k.status;
       console.log(
-        `  #${String(k.id).padEnd(3)} ${k.name.padEnd(20)} ${k.role.padEnd(10)} ${k.key_prefix.padEnd(16)} ` +
-        `${k.active ? '有效' : '已撤销'}  最近使用 ${used}`,
+        `  #${String(k.id).padEnd(3)} ${k.name.padEnd(24)} ${k.role.padEnd(10)} ${k.key_prefix.padEnd(16)} ` +
+        `${statusCn.padEnd(6)} ${String(k.rate_limit_per_min).padStart(5)}/min  ` +
+        `24h ${String(k.requests_24h).padStart(4)} 次  到期 ${exp}`,
       );
+      if (k.rotated_from) console.log(`        ↳ 由 #${k.rotated_from} 轮换而来`);
     }
     return;
   }
@@ -51,10 +55,29 @@ async function main() {
       name,
       role: arg('--role', 'evaluator'),
       description: arg('--desc'),
+      rateLimitPerMin: arg('--rate', null),
+      expiresAt: arg('--expires', null),
     });
     console.log(`已创建 API Key：${row.name}（${row.role}，业务线 ${slug}）\n`);
     console.log(`  ${row.plain}\n`);
     console.log('  ⚠ 明文只显示这一次，请立刻存进 CI secret；库里只有哈希，丢了只能重建。');
+    return;
+  }
+
+  if (argv.includes('--rotate')) {
+    const id = Number(arg('--rotate'));
+    const out = await rotateApiKey({
+      tenantId: tenant.id,
+      id,
+      graceMinutes: Number(arg('--grace', '30')),
+    });
+    console.log(`已轮换 #${id}：旧密钥 ${out.retired.name} 将在 ${out.grace_minutes} 分钟后失效
+`);
+    console.log(`  新密钥 ${out.created.name}（${out.created.role}）
+`);
+    console.log(`  ${out.created.plain}
+`);
+    console.log('  ⚠ 明文只显示这一次。旧密钥仍可用到宽限期结束，方便你更新完配置再撤。');
     return;
   }
 
@@ -68,7 +91,8 @@ async function main() {
 
   console.log(`用法：
   --list   [--tenant slug]
-  --create <名称> [--role viewer|evaluator|admin] [--tenant slug] [--desc "说明"]
+  --create <名称> [--role viewer|evaluator|admin] [--rate 60] [--expires ISO8601] [--tenant slug] [--desc "说明"]
+  --rotate <id>   [--grace 30] [--tenant slug]
   --revoke <id>   [--tenant slug]`);
 }
 

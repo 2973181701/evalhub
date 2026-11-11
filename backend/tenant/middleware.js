@@ -19,7 +19,7 @@ import { bearer, verifyToken, authEnabled } from '../auth.js';
 import { pgEnabled } from '../db.js';
 import { runWithTenant, DEFAULT_TENANT_SLUG } from './context.js';
 import { getTenantBySlug, getTenantById, resolveMembership, defaultTenant } from './repo.js';
-import { looksLikeApiKey, verifyApiKey } from '../apikeys.js';
+import { looksLikeApiKey, verifyApiKey, consumeRateLimit } from '../apikeys.js';
 
 const TTL_MS = 30_000;
 const cache = new Map(); // key → { value, at }
@@ -82,6 +82,20 @@ export async function resolveTenantContext(req) {
       e.status = 403;
       throw e;
     }
+
+    // 按 key 限流：额度是「每把 key 每分钟」，多副本共享同一份计数
+    const rl = await consumeRateLimit(verified.key.id, verified.limit);
+    if (!rl.allowed) {
+      const e = new Error(
+        `请求过于频繁：每分钟上限 ${rl.limit} 次，请在 ${rl.retryAfterSeconds} 秒后重试`,
+      );
+      e.status = 429;
+      e.retryAfter = rl.retryAfterSeconds;
+      // 异常路径下 ctx 还没返回，把配额挂在错误上，否则 429 响应里限额头是空的
+      e.rateLimit = { limit: rl.limit, used: rl.used, remaining: 0 };
+      throw e;
+    }
+
     return {
       ...verified.tenant,
       role: verified.role,
@@ -90,6 +104,7 @@ export async function resolveTenantContext(req) {
       // 审计里要能看出「是哪个密钥干的」，因此把名称写进 actor
       actor: { sub: null, email: `apikey:${verified.key.name}`, role: verified.role, api_key_id: verified.key.id },
       apiKey: verified.key,
+      rateLimit: { limit: rl.limit, used: rl.used, remaining: Math.max(0, rl.limit - rl.used) },
     };
   }
 
@@ -165,12 +180,24 @@ export async function resolveTenantContext(req) {
 
 export function tenantMiddleware() {
   return async (req, res, next) => {
+    let ctx = null;
     try {
-      const ctx = await resolveTenantContext(req);
+      ctx = await resolveTenantContext(req);
       req.tenant = ctx;
       if (ctx.actor) req.user = ctx.actor;
+      if (ctx.rateLimit) {
+        res.setHeader('X-RateLimit-Limit', String(ctx.rateLimit.limit));
+        res.setHeader('X-RateLimit-Remaining', String(ctx.rateLimit.remaining));
+        res.setHeader('X-RateLimit-Used', String(ctx.rateLimit.used));
+      }
       runWithTenant(ctx, () => next());
     } catch (e) {
+      if (e.status === 429) {
+        if (e.retryAfter) res.setHeader('Retry-After', String(e.retryAfter));
+        res.setHeader('X-RateLimit-Limit', String(e.rateLimit?.limit ?? ctx?.rateLimit?.limit ?? ''));
+        res.setHeader('X-RateLimit-Used', String(e.rateLimit?.used ?? ''));
+        return res.status(429).json({ ok: false, error: e.message, retry_after_seconds: e.retryAfter ?? null });
+      }
       if (e.status) return res.status(e.status).json({ ok: false, error: e.message });
       next(e);
     }
