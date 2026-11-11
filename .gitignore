@@ -27,3 +27,10 @@ data/out/annotations_submitted.json
 *.log
 .DS_Store
 Thumbs.db
+
+# ===== 训练产物（权重与检查点不入库，只保留报告与数据清单）=====
+training/out/adapter/
+training/out/checkpoints/
+training/data/train.jsonl
+training/data/rejects.json
+*.safetensors

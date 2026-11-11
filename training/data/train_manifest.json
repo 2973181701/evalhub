@@ -1,0 +1,31 @@
+{
+  "generated_at": "2026-11-11T08:12:01.827Z",
+  "task": "constraint-following",
+  "teacher_model": "glm-4-flash",
+  "source_prompt_file": "data/prompts_extra.json",
+  "prompt_count": 40,
+  "variants_requested": 3,
+  "samples_kept": 91,
+  "samples_rejected": 27,
+  "glm_calls": 40,
+  "content_hash": "2535ff2832bf20612f63fcea1fe49a956f3fcedcb4bdbab3c84d58e21310a875",
+  "provenance": "distilled（GLM 生成，非人工标注）",
+  "eval_isolation": {
+    "eval_file": "data/prompts.json",
+    "eval_prompts": 20,
+    "id_overlap": 0,
+    "prompt_overlap": 0
+  },
+  "by_task_type": {
+    "事实问答": 18,
+    "逻辑推理": 17,
+    "文本摘要": 18,
+    "代码生成": 17,
+    "创意写作": 21
+  },
+  "avg_chars": 15.9,
+  "constraint_check": {
+    "with_char_limit": 42,
+    "max_chars_over_limit": 0
+  }
+}

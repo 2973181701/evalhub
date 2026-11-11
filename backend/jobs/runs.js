@@ -16,11 +16,18 @@
  */
 
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { score } from '../engine.js';
 import { chat, glmReady, glmConfig } from '../glm.js';
 import { pgEnabled, query, withTransaction } from '../db.js';
 import { tenantId, runWithTenant } from '../tenant/context.js';
 import { getTenantById } from '../tenant/repo.js';
+
+// 本地模型回答文件的落地目录（provider=file 专用）
+const ANSWERS_DIR = process.env.EVALHUB_ANSWERS_DIR
+  || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'data', 'answers');
 
 const CONCURRENCY = Math.max(1, Number(process.env.EVAL_CONCURRENCY || 1));
 const ITEM_INTERVAL_MS = Number(process.env.EVAL_ITEM_INTERVAL_MS || 0);
@@ -73,11 +80,47 @@ async function resolveActiveRubric(requestedKey = null) {
 
 const nowIso = () => new Date().toISOString();
 
+/**
+ * provider=file 的文件名白名单校验。
+ *
+ * 这个值来自 HTTP 请求体，会被拼进文件路径 —— 不校验就是目录穿越。
+ * 规则：只允许 ASCII 字母数字与 . _ -，必须以 .json 结尾，不得含 ..，
+ * 也不得以 . 开头（避免读出隐藏文件）。
+ * 路径分隔符（/ 与反斜杠）本来就不在白名单字符集里，因此不需要单独判断 ——
+ * 多加判断反而容易在多层转义里写错。
+ */
+export function isSafeAnswersFile(name) {
+  const s = String(name ?? '');
+  if (!s || s.length > 128) return false;
+  if (!/^[A-Za-z0-9._-]+\.json$/.test(s)) return false;
+  if (s.includes('..')) return false;
+  if (s.startsWith('.')) return false;
+  return true;
+}
+
 // ─────────────────────────── 创建任务 ───────────────────────────
 
 export async function createRun({ provider = 'local', model, ids, config = {}, actor = null }) {
-  if (!['local', 'glm'].includes(provider)) {
-    throw Object.assign(new Error(`不支持的 provider：${provider}（可选 local / glm）`), { status: 400 });
+  if (!['local', 'glm', 'file'].includes(provider)) {
+    throw Object.assign(
+      new Error(`不支持的 provider：${provider}（可选 local / glm / file）`),
+      { status: 400 },
+    );
+  }
+  if (provider === 'file') {
+    // 只允许读 data/answers/ 下的白名单文件名。
+    // 这个接口能用任意字符串当入参，直接拼路径就是典型的目录穿越漏洞。
+    const name = String(config?.answers ?? '');
+    if (!isSafeAnswersFile(name)) {
+      throw Object.assign(
+        new Error('provider=file 需要在 config.answers 指定 data/answers/ 下的文件名（如 qwen_base.json）'),
+        { status: 400 },
+      );
+    }
+    const abs = path.join(ANSWERS_DIR, name);
+    if (!fs.existsSync(abs)) {
+      throw Object.assign(new Error(`答案文件不存在：data/answers/${name}`), { status: 400 });
+    }
   }
   if (provider === 'glm' && !glmReady) {
     throw Object.assign(
@@ -94,7 +137,10 @@ export async function createRun({ provider = 'local', model, ids, config = {}, a
     throw Object.assign(new Error('没有匹配的题目，检查 ids'), { status: 400 });
   }
 
-  const effModel = model || (provider === 'glm' ? glmConfig.model : 'engine-local');
+  const effModel = model
+    || (provider === 'glm' ? glmConfig.model
+      : provider === 'file' ? `file:${String(config?.answers ?? '').replace(/\.json$/, '')}`
+        : 'engine-local');
   const ref = repoRef.datasetRef();
   // 口径血缘：仅 PG 模式可查；历史 run 保持 NULL，不回填。
   const rubricRef = pgEnabled() ? await resolveActiveRubric(config?.rubric_key) : null;
@@ -372,6 +418,16 @@ async function runOne(id, { claimed = false } = {}) {
     : mem.runs.get(id);
 
   const provider = run.provider;
+
+  // file provider：一次读盘，循环里按 id 取，避免每条题都读文件
+  let fileAnswers = null;
+  if (provider === 'file') {
+    const name = String(run.config?.answers ?? '');
+    const abs = path.join(ANSWERS_DIR, path.basename(name));
+    const raw = JSON.parse(fs.readFileSync(abs, 'utf8'));
+    const list = Array.isArray(raw) ? raw : raw.answers ?? [];
+    fileAnswers = new Map(list.map((r) => [r.id, r.answer ?? '']));
+  }
   // 选题必须按任务自己的 item_keys 执行：否则 total_items=3 却会跑完整数据集 20 条
   const items = isPg
     ? (run.item_keys && run.item_keys.length
@@ -398,9 +454,16 @@ async function runOne(id, { claimed = false } = {}) {
       // config.temperature 透传给模型：同模型不同参数的对比全靠它，
       // 否则两次 glm 任务的 config_hash 一样，却解释不了分数差异从哪来
       const temperature = run.config?.temperature;
-      const answer = provider === 'glm'
-        ? await chat(p.prompt, temperature != null ? { temperature: Number(temperature) } : {})
-        : (snapshot.byId.answer.get(p.id)?.answer ?? '');
+      let answer;
+      if (provider === 'glm') {
+        answer = await chat(p.prompt, temperature != null ? { temperature: Number(temperature) } : {});
+      } else if (provider === 'file') {
+        // 本地模型（base / 微调后）的回答由外部脚本生成，这里只负责读进来评分。
+        // 好处是：本地模型与线上模型走完全相同的评分与对比路径，数字可比。
+        answer = fileAnswers?.get(p.id) ?? '';
+      } else {
+        answer = snapshot.byId.answer.get(p.id)?.answer ?? '';
+      }
       const s = score({
         prompt: p.prompt,
         answer,

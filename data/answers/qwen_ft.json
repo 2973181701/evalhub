@@ -1,0 +1,172 @@
+{
+  "model": "D:/evalhub-train/models/Qwen3-1.7B",
+  "adapter": "training/out/adapter",
+  "decoding": "greedy",
+  "max_new_tokens": 200,
+  "generated_at": "2026-11-11T16:44:34",
+  "count": 20,
+  "avg_latency_ms": 1804,
+  "avg_answer_chars": 53.9,
+  "answers": [
+    {
+      "id": "K01",
+      "task_type": "事实问答",
+      "prompt": "中国的首都是哪个城市？",
+      "answer": "中国的首都是北京",
+      "latency_ms": 1314,
+      "output_tokens": 5
+    },
+    {
+      "id": "K02",
+      "task_type": "事实问答",
+      "prompt": "光合作用需要哪些原料？",
+      "answer": "光合作用需要的原料主要包括：\n\n1. **水（H₂O）**：作为电子供体，参与光反应。\n2. **二氧化碳（CO₂）**：作为碳源，被叶绿体利用合成有机物。\n3. **阳光（光能）**：提供反应所需的能量。\n4. **酶**：催化光合作用的各个步骤，如光反应和暗反应中的酶。\n5. **无机盐**：如硝酸盐、磷酸盐，参与叶绿体的结构和功能。\n6. **叶绿体**：光合作用发生的细胞器，含有叶绿素和类胡萝卜素。\n\n这些原料在光合作用中相互转化，最终生成葡萄糖和氧气。",
+      "latency_ms": 8097,
+      "output_tokens": 156
+    },
+    {
+      "id": "K03",
+      "task_type": "事实问答",
+      "prompt": "水的化学式是什么？",
+      "answer": "水的化学式是H₂O，表示每个水分子由两个氢原子和一个氧原子组成。",
+      "latency_ms": 1165,
+      "output_tokens": 24
+    },
+    {
+      "id": "R01",
+      "task_type": "逻辑推理",
+      "prompt": "小明比小红高，小红比小刚高，那么小明和小刚谁高？",
+      "answer": "由传递性可推出，小明比小刚高。",
+      "latency_ms": 696,
+      "output_tokens": 14
+    },
+    {
+      "id": "R02",
+      "task_type": "逻辑推理",
+      "prompt": "所有鸟都会飞。企鹅是鸟。企鹅会飞吗？请先判断这句话的前提是否正确，再回答。",
+      "answer": "前提正确，因为企鹅属于鸟，而所有鸟都会飞，所以企鹅会飞。",
+      "latency_ms": 1067,
+      "output_tokens": 22
+    },
+    {
+      "id": "R03",
+      "task_type": "逻辑推理",
+      "prompt": "一个盒子里有红球和白球，至少有一个红球。如果已知盒子里一共有3个球，最多有几个白球？",
+      "answer": "在盒子里有3个球，且至少有一个红球的情况下，最多可以有2个白球。因为如果白球的数量为2，那么剩下的1个球必然是红球，满足至少有一个红球的条件。",
+      "latency_ms": 2655,
+      "output_tokens": 50
+    },
+    {
+      "id": "S01",
+      "task_type": "文本摘要",
+      "prompt": "请用一句话概括下面这段话：人工智能技术的快速发展正在深刻改变教育、医疗、交通等多个行业，它通过自动化和智能化手段提升了效率，同时也带来了隐私和就业等方面的挑战。",
+      "answer": "人工智能技术迅猛发展，深刻影响教育、医疗、交通等行业，提升效率但引发隐私与就业挑战。",
+      "latency_ms": 1222,
+      "output_tokens": 24
+    },
+    {
+      "id": "S02",
+      "task_type": "文本摘要",
+      "prompt": "请用不超过30字概括：随着5G网络的普及，物联网设备数量激增，智能家居、智慧城市等应用场景不断落地，万物互联的时代正在到来。",
+      "answer": "5G普及，物联网设备激增，万物互联时代来临",
+      "latency_ms": 691,
+      "output_tokens": 14
+    },
+    {
+      "id": "E01",
+      "task_type": "情感分析",
+      "prompt": "判断这句话的情绪（正面/负面/中性）：「这家店的服务态度太差了，再也不会来了。」",
+      "answer": "负面",
+      "latency_ms": 102,
+      "output_tokens": 2
+    },
+    {
+      "id": "E02",
+      "task_type": "情感分析",
+      "prompt": "判断这句话的情绪（正面/负面/中性）：「今天天气不错，心情很好。」",
+      "answer": "这句话表达了积极的情绪，因为天气不错和心情很好都是正面的描述。",
+      "latency_ms": 856,
+      "output_tokens": 17
+    },
+    {
+      "id": "E03",
+      "task_type": "情感分析",
+      "prompt": "判断这句话的情绪（正面/负面/中性）：「这件衣服是棉质的，尺码标准。」",
+      "answer": "中性",
+      "latency_ms": 147,
+      "output_tokens": 3
+    },
+    {
+      "id": "C01",
+      "task_type": "代码生成",
+      "prompt": "用 Python 写一个函数，判断一个数是否为素数。",
+      "answer": "def is_prime(n):\n    if n < 2:\n        return False\n    for i in range(2, int(n**0.5)+1):\n        if n % i == 0:\n            return False\n    return True",
+      "latency_ms": 2454,
+      "output_tokens": 50
+    },
+    {
+      "id": "C02",
+      "task_type": "代码生成",
+      "prompt": "用 Python 写一个函数，计算列表中所有数字的平均值，列表为空时返回0。",
+      "answer": "def average(lst):\n    return sum(lst) / len(lst) if lst else 0",
+      "latency_ms": 931,
+      "output_tokens": 19
+    },
+    {
+      "id": "W01",
+      "task_type": "创意写作",
+      "prompt": "为一家新开的奶茶店写一句15字以内的宣传语。",
+      "answer": "一盏奶茶，治愈午后时光。",
+      "latency_ms": 430,
+      "output_tokens": 9
+    },
+    {
+      "id": "W02",
+      "task_type": "创意写作",
+      "prompt": "用3句话写一个关于「坚持」的小故事，要有转折。",
+      "answer": "他每天坚持练习，直到第四十天，那首曲子竟在他指尖流淌成歌。",
+      "latency_ms": 1041,
+      "output_tokens": 22
+    },
+    {
+      "id": "K04",
+      "task_type": "事实问答",
+      "prompt": "2024年夏季奥运会在哪个城市举办？",
+      "answer": "2024年夏季奥运会在巴黎举办",
+      "latency_ms": 500,
+      "output_tokens": 11
+    },
+    {
+      "id": "R04",
+      "task_type": "逻辑推理",
+      "prompt": "A、B、C三人中只有一人说了真话。A说：不是我。B说：是C。C说：不是我。请问是谁？",
+      "answer": "由A、B、C三人中只有一人说了真话，可推出以下情况：\n\n1. **若A说真话**，则A不是罪犯，B和C说谎。B说“是C”为假，故C是罪犯；C说“不是我”为假，故C是罪犯，矛盾。\n2. **若B说真话**，则B不是罪犯，A和C说谎。A说“不是我”为假，故A是罪犯；C说“不是我”为假，故C是罪犯，矛盾。\n3. **若C说真话**，则C不是罪犯，A和B说谎。A说“不是我”为假，故A是罪犯；B说“是C”为假，故C是罪犯，矛盾。\n\n综上，**矛盾均存在**，但实际中只能有一人说真话",
+      "latency_ms": 10196,
+      "output_tokens": 200
+    },
+    {
+      "id": "S03",
+      "task_type": "文本摘要",
+      "prompt": "请用一句话概括：远程办公在疫情后成为一种常态化选择，它减少了通勤时间、降低了办公成本，但也带来了团队沟通效率下降和员工工作生活界限模糊的问题。",
+      "answer": "远程办公虽省时省力，却引发沟通效率下降与工作界限模糊的挑战。",
+      "latency_ms": 1107,
+      "output_tokens": 21
+    },
+    {
+      "id": "C03",
+      "task_type": "代码生成",
+      "prompt": "用 Python 写一个函数，把字符串反转。",
+      "answer": "def reverse_string(s): return s[::-1]",
+      "latency_ms": 545,
+      "output_tokens": 11
+    },
+    {
+      "id": "W03",
+      "task_type": "创意写作",
+      "prompt": "写一段50字以内的自我介绍，突出「细心、爱学习」两个特点。",
+      "answer": "细心如丝，爱学如渴，日日精进不息。",
+      "latency_ms": 866,
+      "output_tokens": 17
+    }
+  ]
+}
