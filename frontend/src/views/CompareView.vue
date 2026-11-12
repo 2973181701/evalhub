@@ -24,6 +24,7 @@ const DIM_CN = {
   logic: '逻辑性',
   safety: '安全性',
   expression: '表达质量',
+  constraint: '约束遵循',
 };
 
 const finishedRuns = computed(() => runs.value.filter((r) => r.status === 'succeeded' || r.status === 'failed'));

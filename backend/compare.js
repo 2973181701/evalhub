@@ -45,6 +45,10 @@ async function loadResults(id) {
         acc[d] = r.scores?.[d] ?? null;
         return acc;
       }, {}),
+      // 约束门禁字段：本轮新增，历史 run 没有 → 保持 null，不要当成 0
+      constraint: typeof r.scores?.constraint === 'number' ? r.scores.constraint : null,
+      gated_total: typeof r.scores?.gated_total === 'number' ? r.scores.gated_total : null,
+      gate: typeof r.scores?.gate === 'string' ? r.scores.gate : null,
     });
   }
   return map;
@@ -61,10 +65,23 @@ const round = (x, n = 2) => Number(x.toFixed(n));
 
 function aggregate(list) {
   const valid = list.filter((x) => !x.error && x.total !== null);
+  const nums = (key) =>
+    valid.map((x) => x[key]).filter((v) => typeof v === 'number' && Number.isFinite(v));
+  const constraint = nums('constraint');
+  const gated = nums('gated_total');
   return {
     n: valid.length,
     total: round(mean(valid.map((x) => x.total))),
     dims: Object.fromEntries(DIMS.map((d) => [d, round(mean(valid.map((x) => Number(x[d]) || 0)))])),
+    // 约束门禁只在有数据时给值：历史 run 没有这一维，填 0 会污染均值
+    constraint: constraint.length ? round(mean(constraint)) : null,
+    gated_total: gated.length ? round(mean(gated)) : null,
+    gate_counts: {
+      pass: valid.filter((x) => x.gate === 'pass').length,
+      warn: valid.filter((x) => x.gate === 'warn').length,
+      fail: valid.filter((x) => x.gate === 'fail').length,
+      unknown: valid.filter((x) => !x.gate).length,
+    },
     latency_p50: (() => {
       const lat = valid.map((x) => x.latency_ms).filter((x) => typeof x === 'number').sort((a, b) => a - b);
       return lat.length ? lat[Math.floor(lat.length / 2)] : null;
@@ -162,6 +179,10 @@ export async function compareRuns(idA, idB) {
       delta: round(bTotal - aTotal),
       a_dims: DIMS.reduce((o, d) => ((o[d] = x[d]), o), {}),
       b_dims: DIMS.reduce((o, d) => ((o[d] = y[d]), o), {}),
+      a_constraint: x.constraint,
+      b_constraint: y.constraint,
+      a_gate: x.gate,
+      b_gate: y.gate,
       a_error: x.error,
       b_error: y.error,
     };
@@ -196,12 +217,26 @@ export async function compareRuns(idA, idB) {
       best: sorted[0] ?? null,
       worst: sorted[sorted.length - 1] ?? null,
     },
-    by_dimension: DIMS.map((d) => ({
-      dim: d,
-      a: aggA.dims[d],
-      b: aggB.dims[d],
-      delta: round(aggB.dims[d] - aggA.dims[d]),
-    })),
+    by_dimension: [
+      ...DIMS.map((d) => ({
+        dim: d,
+        a: aggA.dims[d],
+        b: aggB.dims[d],
+        delta: round(aggB.dims[d] - aggA.dims[d]),
+      })),
+      // 约束遵循单列：它不是五维之一，不进均分，只做门禁与参考
+      ...(aggA.constraint !== null || aggB.constraint !== null
+        ? [{
+            dim: 'constraint',
+            a: aggA.constraint,
+            b: aggB.constraint,
+            delta: aggA.constraint !== null && aggB.constraint !== null
+              ? round(aggB.constraint - aggA.constraint)
+              : null,
+            kind: 'constraint',
+          }]
+        : []),
+    ],
     items,
   };
 }

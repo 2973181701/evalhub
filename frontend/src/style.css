@@ -211,6 +211,18 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-fam
 .total-num { font-size: 30px; font-weight: 700; color: var(--brand-dark); font-variant-numeric: tabular-nums; line-height: 1; }
 .total-label { font-size: 12px; color: var(--text-2); }
 
+/* 约束门禁：规则判定，不是模型偏好。违规时给总分封顶，不参与五维均分。 */
+.gate-box { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.gate-badge {
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.gate-note { font-size: 11.5px; color: var(--text-2); }
+
 /* ── 代码/文本块 ────────────────────────────────────── */
 
 pre.answer {

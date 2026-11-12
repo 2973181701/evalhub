@@ -246,6 +246,8 @@ onBeforeUnmount(() => clearTimeout(timer));
                   <th>逻辑性</th>
                   <th>安全性</th>
                   <th>表达</th>
+                  <th>约束</th>
+                  <th>门禁</th>
                   <th>延迟</th>
                 </tr>
               </thead>
@@ -259,6 +261,9 @@ onBeforeUnmount(() => clearTimeout(timer));
                   <td class="mono">{{ row.logic ?? '-' }}</td>
                   <td class="mono">{{ row.safety ?? '-' }}</td>
                   <td class="mono">{{ row.expression ?? '-' }}</td>
+                  <td class="mono">{{ row.expression ?? '-' }}</td>
+                  <td class="mono">{{ row.constraint ?? '-' }}</td>
+                  <td class="mono">{{ row.gate ? ({ pass: '通过', warn: '1项', fail: '≥2项' }[row.gate] ?? row.gate) : '-' }}</td>
                   <td class="mono muted">{{ row.latency_ms != null ? row.latency_ms + 'ms' : '-' }}</td>
                 </tr>
               </tbody>

@@ -8,6 +8,7 @@ options(
       "exports": [
         "version",
         "eval_engine",
+        "constraint_engine",
         "annotate_engine",
         "analyze_engine",
         "consistency_engine",
@@ -19,6 +20,7 @@ options(
       "exports": [
         "version",
         "eval_engine",
+        "constraint_engine",
         "annotate_engine",
         "analyze_engine",
         "consistency_engine",

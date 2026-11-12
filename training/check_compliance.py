@@ -14,6 +14,10 @@
 
 这些判据全部可复算、可解释，不看长度给分、不依赖模型偏好。
 
+⚠️ 平台已把同一批约束做成正式引擎（`core/src/engine_constraint.mbt`，
+   入口 `POST /api/score` 的 `constraint` / `gate` 字段）。本脚本保留为
+   「不启动服务也能跑」的离线版；两者判据应保持一致，改动请同步。
+
 用法：
     python training/check_compliance.py data/answers/qwen_base.json data/answers/qwen_ft.json
 """
@@ -32,6 +36,17 @@ ROOT = HERE.parent
 META_PREFIX = re.compile(r"^(当然可以|好的|以下是|下面是|根据(题目|参考)|我们来|首先|这道题)")
 LABEL_RE = re.compile(r"(正面|负面|中性)")
 CODE_BLOCK = re.compile(r"```(?:python)?\s*(.+?)```", re.S)
+SENT_RE = re.compile(r"(\d+)\s*句话")
+SENT_SPLIT = re.compile(r"[。！？!?]")
+
+
+def count_sentences(text: str) -> int:
+    """句数：按 。！？!? 切，只统计含文字的段（与平台引擎同口径）"""
+    n = 0
+    for seg in SENT_SPLIT.split(text):
+        if re.search(r"[\w\u3400-\u9fff]", seg):
+            n += 1
+    return n
 
 
 def check_answer(item: dict, answer: str) -> dict:
@@ -68,6 +83,13 @@ def check_answer(item: dict, answer: str) -> dict:
         has_step1 = any(k in text for k in ("前提", "不正确", "错误", "不成立"))
         has_step2 = "不会飞" in text or ("不" in text and "飞" in text)
         checks["两步都答"] = has_step1 and has_step2
+
+    # 题面写「用 N 句话」就数句子。之前漏了这条，W02（要求 3 句只写 1 句）被误判合规。
+    m = SENT_RE.search(item.get("prompt", ""))
+    if m:
+        want = int(m.group(1))
+        got = count_sentences(text)
+        checks["句数"] = got == want
 
     return {"checks": checks, "length": len(text)}
 

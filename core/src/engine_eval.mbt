@@ -1,11 +1,18 @@
 ///|
-/// 评测引擎 · 5 维评分（纯规则、确定性、可单测）
+/// 评测引擎 · 5 维评分 + 约束门禁（纯规则、确定性、可单测）
 ///
 /// 数据契约（JSON in → JSON out）：
 /// 输入  { "prompt": "...", "answer": "...", "reference": "...", "task_type": "事实问答" }
 /// 输出  { "accuracy": 4.0, "completeness": 3.5, "logic": 4.0,
-///         "safety": 5.0, "expression": 3.5, "total": 4.0 }
+///         "safety": 5.0, "expression": 3.5, "total": 4.0,
+///         "constraint": 5.0, "gate": "pass", "critical_failed": 0,
+///         "gated_total": 4.0, "constraint_checks": [...] }
 /// 维度：准确性 / 完整性 / 逻辑性 / 安全性 / 表达质量，各 0–5，total 为均分。
+///
+/// total 与 gated_total 的区别（这是两件事，别混）：
+///   total       五维均分，衡量「与参考文本的覆盖度与表达」——对长度敏感
+///   constraint  约束遵循分，只看题面写明的约束有没有守住——对长度不敏感
+///   gated_total min(total, gate 封顶值)：没按要求作答就不该算合格
 /// 输入不是合法 JSON 时输出 { "error": "..." }，绝不向宿主抛错。
 
 ///|
@@ -27,7 +34,9 @@ pub fn eval_engine(input : String) -> String {
   let answer = get_str(j, "answer")
   let reference = get_str(j, "reference")
   let task_type = get_str(j, "task_type")
-  result_json(eval_score(prompt, answer, reference, task_type))
+  let r = eval_score(prompt, answer, reference, task_type)
+  let g = check_constraints(prompt, answer)
+  result_json(r, g)
 }
 
 ///|
@@ -662,13 +671,29 @@ fn error_json(code : String) -> String {
 }
 
 ///|
-fn result_json(r : ScoreResult) -> String {
-  let m : Map[String, Json] = Map([], capacity=8)
+fn result_json(r : ScoreResult, g : ConstraintReport) -> String {
+  let cap = gate_cap(g.gate)
+  let gated = if r.total < cap { r.total } else { cap }
+  let m : Map[String, Json] = Map([], capacity=12)
   m["accuracy"] = Json::number(r.accuracy)
   m["completeness"] = Json::number(r.completeness)
   m["logic"] = Json::number(r.logic)
   m["safety"] = Json::number(r.safety)
   m["expression"] = Json::number(r.expression)
   m["total"] = Json::number(r.total)
+  m["constraint"] = Json::number(g.score)
+  m["gate"] = Json::string(g.gate)
+  m["critical_failed"] = Json::number(Double::from_int(g.critical_failed))
+  m["gated_total"] = Json::number(round2(gated))
+  let arr : Array[Json] = []
+  for c in g.checks {
+    arr.push(check_json_obj(c))
+  }
+  m["constraint_checks"] = Json::array(arr)
+  let rev : Array[Json] = []
+  for x in g.review_items {
+    rev.push(Json::string(x))
+  }
+  m["needs_review"] = Json::array(rev)
   Json::object(m).stringify()
 }
