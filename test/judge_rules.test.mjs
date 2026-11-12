@@ -10,7 +10,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { decideByRule, charCount } from '../backend/judge_rules.js';
+import { decideByRule, charCount, resolveTie, stripDecoration } from '../backend/judge_rules.js';
 
 const long = '这是一段很长的解释性文字。'.repeat(20); // ~280 字
 
@@ -120,4 +120,53 @@ test('全角与半角括号都能识别', () => {
   const base = { answer_A: '正面', answer_B: long };
   assert.equal(decideByRule({ ...base, prompt: '判断情绪(正面/负面/中性)' }).rule, 'label_enum');
   assert.equal(decideByRule({ ...base, prompt: '判断情绪（正面/负面/中性）' }).rule, 'label_enum');
+});
+
+// ───────────── 平手兜底：只差一层无信息包装 ─────────────
+// 四条用例全部来自留出集真实样本（Judge 判平手、人判了明确一方）
+
+test('平手兜底 L083：B 是 A 加「简明地说：」前缀 → 判 A 赢', () => {
+  const r = resolveTie({ answer_A: '是，由传递性可推出', answer_B: '简明地说：是，由传递性可推出。' });
+  assert.equal(r.choice, 'A');
+  assert.equal(r.rule, 'wrap_only');
+});
+
+test('平手兜底 L182：A 带前缀而 B 是裸内容 → 判 B 赢', () => {
+  const r = resolveTie({
+    answer_A: '简明地说：开源模型降低门槛，合规与成本仍是规模化障碍。',
+    answer_B: '开源模型降低门槛，合规与成本仍是规模化障碍',
+  });
+  assert.equal(r.choice, 'B');
+});
+
+test('平手兜底 L262：标签外裹前缀 → 判裸标签赢', () => {
+  const r = resolveTie({ answer_A: '简明地说：正面。', answer_B: '正面' });
+  assert.equal(r.choice, 'B');
+});
+
+test('平手兜底 L381：B 裹「一般认为是「…」。」转述外壳 → 判 A 赢', () => {
+  const r = resolveTie({
+    answer_A: '便利店通常营业到很晚，有的甚至是 24 小时营业，为夜间出行的人提供便利。',
+    answer_B: '一般认为是「便利店通常营业到很晚，有的甚至是 24 小时营业，为夜间出行的人提供便利。」。',
+  });
+  assert.equal(r.choice, 'A');
+});
+
+test('平手兜底不误伤：内容不同就维持平手', () => {
+  assert.equal(resolveTie({ answer_A: '北京', answer_B: '上海' }), null);
+  assert.equal(resolveTie({ answer_A: '北京是中国的首都，有悠久历史。', answer_B: '北京是中国的首都。' }), null);
+});
+
+test('平手兜底不误伤：承载语义的前缀（错：/对：）不算包装', () => {
+  assert.equal(resolveTie({ answer_A: '错：北京', answer_B: '北京' }), null);
+});
+
+test('平手兜底不误伤：两方完全相同交给上游 identical 守卫', () => {
+  assert.equal(resolveTie({ answer_A: '负面', answer_B: '负面' }), null);
+});
+
+test('stripDecoration 去引号/括号/尾标点', () => {
+  assert.equal(stripDecoration('「正面」'), '正面');
+  assert.equal(stripDecoration('“是，由传递性可推出。”'), '是，由传递性可推出');
+  assert.equal(stripDecoration(' 北京。'), '北京');
 });

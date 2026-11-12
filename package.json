@@ -24,7 +24,10 @@
     "apikey:list": "node tools/api-key.mjs --list",
     "apikey:create": "node tools/api-key.mjs",
     "apikey:revoke": "node tools/api-key.mjs",
-    "apikey:rotate": "node tools/api-key.mjs"
+    "apikey:rotate": "node tools/api-key.mjs",
+    "label:sheet": "node tools/export_label_sheet.mjs",
+    "label:import": "node tools/import_labels.mjs",
+    "label:page": "node tools/make_label_page.mjs"
   },
   "dependencies": {
     "pg": "^8.13.1"

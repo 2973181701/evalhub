@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>EvalHub · 留出集标注（7 条）</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --panel-2: #1d2129; --line: #2a2f3a;
+    --text: #e6e9ef; --text-2: #9aa4b2; --brand: #6ea8fe; --ok: #34d399;
+    --warn: #fbbf24; --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.65 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    padding: 22px 18px 90px;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; }
+  header { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; flex-wrap: wrap; }
+  .bar { flex: 1; height: 6px; background: var(--panel-2); border-radius: 999px; overflow: hidden; min-width: 140px; }
+  .bar > i { display: block; height: 100%; width: 0; background: var(--brand); transition: width .18s ease; }
+  .meta { color: var(--text-2); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .tag { font-size: 12px; color: var(--brand); border: 1px solid #2b3d5c; background: #16202e;
+         padding: 1px 8px; border-radius: 999px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 12px; }
+  .q { font-size: 16px; font-weight: 600; margin: 2px 0 0; }
+  .ans { white-space: pre-wrap; word-break: break-word; }
+  .ans-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .key { font-family: var(--mono); font-size: 12px; font-weight: 700; width: 22px; height: 22px;
+         display: grid; place-items: center; border-radius: 6px; background: #253045; color: var(--brand); }
+  .hint { position: fixed; left: 0; right: 0; bottom: 0; background: #12151b; border-top: 1px solid var(--line);
+          padding: 10px 18px; display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; font-size: 13px; color: var(--text-2); }
+  kbd { font-family: var(--mono); background: #232936; border: 1px solid #333b4b; border-bottom-width: 2px;
+        border-radius: 5px; padding: 1px 6px; color: var(--text); font-size: 12px; }
+  .done { text-align: center; padding: 40px 0; }
+  .done h2 { margin: 0 0 6px; font-size: 22px; }
+  .btns { display: flex; gap: 10px; justify-content: center; margin-top: 18px; flex-wrap: wrap; }
+  button { font: inherit; padding: 10px 18px; border-radius: 9px; border: 1px solid var(--line);
+           background: var(--panel-2); color: var(--text); cursor: pointer; }
+  button.primary { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+  button:hover { filter: brightness(1.12); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 16px; }
+  th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); }
+  th { color: var(--text-2); font-weight: 500; }
+  .muted { color: var(--text-2); }
+  .note { font-size: 12.5px; color: var(--text-2); margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="tag" id="tag">··</span>
+    <div class="bar"><i id="prog"></i></div>
+    <span class="meta" id="counter">0 / 7</span>
+  </header>
+
+  <div id="app"></div>
+</div>
+
+<div class="hint">
+  <span><kbd>A</kbd> 选 A</span>
+  <span><kbd>B</kbd> 选 B</span>
+  <span><kbd>T</kbd> 平手</span>
+  <span><kbd>S</kbd> 跳过</span>
+  <span><kbd>⌫</kbd> 回退</span>
+  <span class="muted">只看「哪个更好地完成了题目要求」，别按长度判</span>
+</div>
+
+<script>
+const ITEMS = [{"id":"L081","task_type":"逻辑推理","prompt":"所有 A 都是 B，所有 B 都是 C。那么某个 A 一定是 C 吗？","a":"这个问题涉及多个方面，建议查阅相关资料或官方文档。不同场景下结论可能不同，需要结合具体情况综合判断，也可以咨询专业人士获取更准确的建议。","b":"是，由传递性可推出","prev":"A"},{"id":"L082","task_type":"逻辑推理","prompt":"所有 A 都是 B，所有 B 都是 C。那么某个 A 一定是 C 吗？","a":"这个问题涉及多个方面，建议查阅相关资料或官方文档。不同场景下结论可能不同，需要结合具体情况综合判断，也可以咨询专业人士获取更准确的建议。","b":"是，由传递性可推出","prev":"A"},{"id":"L083","task_type":"逻辑推理","prompt":"所有 A 都是 B，所有 B 都是 C。那么某个 A 一定是 C 吗？","a":"是，由传递性可推出","b":"简明地说：是，由传递性可推出。","prev":"B"},{"id":"L093","task_type":"逻辑推理","prompt":"袋子里有 5 个红球和 3 个蓝球，闭眼至少摸出几个才能保证有 2 个同色？","a":"一般认为是「4 个」。","b":"4 个","prev":"A"},{"id":"L182","task_type":"文本摘要","prompt":"请用一句话概括：开源模型降低了企业试用门槛，但私有数据合规与推理成本仍是其规模化的主要障碍。","a":"简明地说：开源模型降低门槛，合规与成本仍是规模化障碍。","b":"开源模型降低门槛，合规与成本仍是规模化障碍","prev":"B"},{"id":"L262","task_type":"情感分析","prompt":"判断情绪（正面/负面/中性）：「改版之后找功能比以前快多了。」","a":"简明地说：正面。","b":"正面","prev":"B"},{"id":"L381","task_type":"创意写作","prompt":"用一句话描写「深夜的便利店」。","a":"便利店通常营业到很晚，有的甚至是 24 小时营业，为夜间出行的人提供便利。","b":"一般认为是「便利店通常营业到很晚，有的甚至是 24 小时营业，为夜间出行的人提供便利。」。","prev":"A"}];
+const KEY = 'evalhub_heldout_' + (ITEMS[0] && ITEMS[0].prev ? 'review' : 'v2');
+let state = load();          // { idx, labels: { id: 'A'|'B'|'平手' } }
+let idx = state.idx || 0;
+
+function load() {
+  try { return JSON.parse(localStorage.getItem(KEY)) || { idx: 0, labels: {} }; }
+  catch { return { idx: 0, labels: {} }; }
+}
+function save() {
+  state.idx = idx;
+  localStorage.setItem(KEY, JSON.stringify(state));
+}
+function answered() { return Object.keys(state.labels).length; }
+
+function render() {
+  const app = document.getElementById('app');
+  const n = ITEMS.length;
+  document.getElementById('prog').style.width = ((answered() / n) * 100) + '%';
+  document.getElementById('counter').textContent = answered() + ' / ' + n + ' 已标';
+
+  if (idx >= n) {
+    app.innerHTML = doneHtml();
+    document.getElementById('tag').textContent = '完成';
+    return;
+  }
+  const it = ITEMS[idx];
+  document.getElementById('tag').textContent = it.task_type + ' · ' + it.id;
+  app.innerHTML = `
+    <div class="card">
+      <div class="ans-head"><span class="meta">题目</span>${it.prev ? `<span class="tag">上次标了 ${it.prev}</span>` : ''}</div>
+      <div class="q">${it.prompt}</div>
+    </div>
+    <div class="card">
+      <div class="ans-head"><span class="key">A</span><span class="meta">回答 A</span></div>
+      <div class="ans">${it.a}</div>
+    </div>
+    <div class="card">
+      <div class="ans-head"><span class="key">B</span><span class="meta">回答 B</span></div>
+      <div class="ans">${it.b}</div>
+    </div>`;
+}
+
+function doneHtml() {
+  const rows = ITEMS.map((it) => {
+    const c = state.labels[it.id] || '';
+    return `<tr><td class="muted">${it.id}</td><td>${c || '<span class="muted">未标</span>'}</td></tr>`;
+  }).join('');
+  const missing = ITEMS.filter((it) => !state.labels[it.id]).length;
+  return `
+    <div class="done">
+      <h2>标完了</h2>
+      <div class="muted">共 ${ITEMS.length} 条，已标 ${ITEMS.length - missing} 条${missing ? '，未标 ' + missing + ' 条（可导出后补）' : ''}</div>
+      <div class="btns">
+        <button class="primary" onclick="download()">下载 CSV</button>
+        <button onclick="copyCsv(this)">复制 CSV</button>
+        <button onclick="back()">回去检查</button>
+        <button onclick="resetAll()">重新开始（清空）</button>
+      </div>
+      <div class="note">CSV 存到 <code>reports/label_sheet_heldout.csv</code> 覆盖同名文件，然后回来告诉我。</div>
+      <table><thead><tr><th>id</th><th>choice</th></tr></thead><tbody>${rows}</tbody></table>
+    </div>`;
+}
+
+function csv() {
+  const lines = ['id,choice,confidence,reason'];
+  for (const it of ITEMS) {
+    const c = state.labels[it.id] || '';
+    lines.push(it.id + ',' + c + ',,');
+  }
+  return lines.join('\n') + '\n';
+}
+window.download = function () {
+  const blob = new Blob([csv()], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'label_sheet_heldout.csv'; a.click();
+  URL.revokeObjectURL(url);
+};
+window.copyCsv = async function (btn) {
+  try { await navigator.clipboard.writeText(csv()); btn.textContent = '已复制'; }
+  catch { btn.textContent = '复制失败，请用下载'; }
+};
+window.back = function () { idx = Math.max(0, idx - 1); save(); render(); };
+window.resetAll = function () {
+  if (!confirm('清空所有已标结果？')) return;
+  state = { idx: 0, labels: {} }; idx = 0; save(); render();
+};
+
+function pick(choice) {
+  if (idx >= ITEMS.length) return;
+  state.labels[ITEMS[idx].id] = choice;
+  idx += 1; save(); render();
+}
+
+document.addEventListener('keydown', (e) => {
+  const k = e.key.toLowerCase();
+  if (k === 'a') pick('A');
+  else if (k === 'b') pick('B');
+  else if (k === 't' || k === ' ') { e.preventDefault(); pick('平手'); }
+  else if (k === 's') { idx = Math.min(ITEMS.length, idx + 1); save(); render(); }
+  else if (e.key === 'Backspace') { e.preventDefault(); idx = Math.max(0, idx - 1); save(); render(); }
+});
+
+render();
+</script>
+</body>
+</html>

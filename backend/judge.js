@@ -18,7 +18,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { chat, glmReady, glmConfig } from './glm.js';
-import { decideByRule } from './judge_rules.js';
+import { decideByRule, resolveTie } from './judge_rules.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
@@ -507,7 +507,7 @@ export async function preferPair({
     e.status = 503;
     throw e;
   }
-  const key = `p:${PROMPT_VERSION}:${sha([prompt, answer_A, answer_B].join('\u0000'))}`;
+  const key = `p:${PROMPT_VERSION}:t1:${sha([prompt, answer_A, answer_B].join('\u0000'))}`;
 
 
   // 确定性守卫：两方文本（忽略空白）完全相同时必然是平手。
@@ -636,6 +636,21 @@ export async function preferPair({
       : {}),
     model: glmConfig.model,
   };
+
+  // 平手兜底：留出集上 Judge 的 4 条分歧全是它判平手，且都是
+  // 「一方 = 另一方 + 无信息包装」。模型对这类结构性差异反复失手，
+  // 但它是可机检的，不该交给模型。改判留痕：llm_choice 保留模型原判。
+  if (out.choice === '平手') {
+    const fixed = resolveTie({ answer_A, answer_B });
+    if (fixed) {
+      out.llm_choice = '平手';
+      out.choice = fixed.choice;
+      out.decided_by = 'tie_rule';
+      out.tie_rule = fixed.rule;
+      out.analysis = `${out.analysis}｜兜底：${fixed.detail}`.slice(0, 200);
+      out.reason = '包装不加分（确定性规则）';
+    }
+  }
   const c = loadCache();
   c[key] = out;
   saveCache();

@@ -24,6 +24,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { runInTenant } from '../backend/tenant/cli.js';
+import { tenantId } from '../backend/tenant/context.js';
 import { query, withTransaction, closePool } from '../backend/db.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -39,18 +41,18 @@ const FILLER = '需要说明的是，不同资料的表述可能略有差异，�
   + '如果需要，我还可以进一步展开说明、补充背景、列举示例，或者用表格形式做对比，'
   + '也可以针对不同使用场景分别给出更详细的操作建议与注意事项。';
 
-const concise = (t) => String(t.ref).trim();
-const verbose = (t) => `${String(t.ref).trim()}。${FILLER}${FILLER}`;
+const concise = (t) => String(t.reference).trim();
+const verbose = (t) => `${String(t.reference).trim()}。${FILLER}${FILLER}`;
 const wrong = (t) => String(t.distractor).trim();
 const offtopic = () => '这个问题涉及多个方面，建议查阅相关资料或官方文档。'
   + '不同场景下结论可能不同，需要结合具体情况综合判断，也可以咨询专业人士获取更准确的建议。';
-const violation = (t) => `${String(t.ref).trim()}。${FILLER}${FILLER}${FILLER}${FILLER}`;
+const violation = (t) => `${String(t.reference).trim()}。${FILLER}${FILLER}${FILLER}${FILLER}`;
 const hedging = (t) => `初步看，答案可能是「${t.distractor}」。不过重新审视一下，这个推断似乎有问题，`
-  + `也许应该是「${t.ref}」。但再仔细想想，前面的假设未必成立，需要重新审视。`
+  + `也许应该是「${t.reference}」。但再仔细想想，前面的假设未必成立，需要重新审视。`
   + '经过反复比较，两种说法好像都有道理，暂时无法给出确定结论，建议再次核对题目条件。';
-const goodAlt = (t) => `简明地说：${String(t.ref).trim()}。`;
+const goodAlt = (t) => `简明地说：${String(t.reference).trim()}。`;
 const badAlt = (t) => `一般认为是「${String(t.distractor).trim()}」。`;
-const codeOnly = (t) => `def solve(x):\n    # ${String(t.ref).trim()}\n    return x`;
+const codeOnly = (t) => `def solve(x):\n    # ${String(t.reference).trim()}\n    return x`;
 const codeExplained = (t) => `${codeOnly(t)}\n\n${'上面这段代码实现了题目要求的功能。'.repeat(8)}\n${FILLER}${FILLER}`;
 
 // 每种策略：[/A 构造, /B 构造, 设计意图, 标签名]
@@ -125,8 +127,33 @@ function buildPairs(topics, perPrompt, testSet) {
   return rows;
 }
 
-function contentHash(rows) {
-  const normalized = rows
+/**
+ * 输出校验：生成器最容易犯的不是逻辑错，而是**字段名写错后产出字面量 "undefined"**。
+ * 这种数据一旦落库，标注员看到的是「A 是一段废话、B 是 undefined」，
+ * 会毫不犹豫地全选同一侧 —— κ 很好看，但什么都没测到。
+ * 所以这里宁可让脚本炸掉，也不允许占位符进库。
+ */
+const PLACEHOLDER = /(^|\W)(undefined|null|NaN)(\W|$)/i;
+function assertNoPlaceholder(rows) {
+  const bad = [];
+  for (const r of rows) {
+    for (const f of ['prompt', 'answer_a', 'answer_b']) {
+      const v = String(r[f] ?? '');
+      // 长度只要求非空：题库里有「5」「甲」这种一字答案，是合法内容。
+      // 这里只挡空串与占位符，不替标注员判断「这题好不好判」。
+      if (v.trim().length < 1 || PLACEHOLDER.test(v)) {
+        bad.push(`${r.id}.${f} = ${JSON.stringify(v.slice(0, 40))}`);
+      }
+    }
+  }
+  if (bad.length) {
+    throw new Error(
+      `生成结果含空值或占位符 ${bad.length} 处，拒绝继续：\n  ` + bad.slice(0, 10).join('\n  '),
+    );
+  }
+}
+
+function contentHash(rows) {  const normalized = rows
     .map((r) => [r.id, r.prompt, r.answer_a, r.answer_b, r.expected_choice, r.split].join('\u0000'))
     .sort()
     .join('\u0001');
@@ -182,6 +209,7 @@ async function main() {
   const testSet = new Set(ranked.slice(0, Math.round(topics.length * 0.3)).map((t) => t.id));
 
   const rows = buildPairs(topics, perPrompt, testSet);
+  assertNoPlaceholder(rows);
   const st = stats(rows);
   const hash = contentHash(rows);
 
@@ -205,7 +233,10 @@ async function main() {
   }
 
   const written = await withTransaction(async (client) => {
-    const exist = await client.query('SELECT content_hash, pair_count FROM label_batches WHERE name=$1', [batch]);
+    const exist = await client.query(
+      'SELECT content_hash, pair_count FROM label_batches WHERE name=$1 AND tenant_id=$2',
+      [batch, tenantId()],
+    );
     if (exist.rows.length) {
       if (exist.rows[0].content_hash === hash) {
         return { skipped: true, count: Number(exist.rows[0].pair_count) };
@@ -214,28 +245,32 @@ async function main() {
     }
 
     await client.query(
-      `INSERT INTO label_batches (name, generator, config, content_hash, pair_count, note)
-       VALUES ($1, $2, $3::jsonb, $4, $5, $6)`,
+      `INSERT INTO label_batches (tenant_id, name, generator, config, content_hash, pair_count, note)
+       VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7)`,
       [
+        tenantId(),
         batch,
-        'build_label_queue.mjs@v1',
+        'build_label_queue.mjs@v2',
         JSON.stringify({ per_prompt: perPrompt, topics: topics.length, strategies: STRATEGIES.length }),
         hash,
         rows.length,
         '8 种失败模式；位置随机化；按题目哈希切分留出集；expected_choice 为设计意图而非标签',
       ],
     );
-    const { rows: b } = await client.query('SELECT id FROM label_batches WHERE name=$1', [batch]);
+    const { rows: b } = await client.query(
+      'SELECT id FROM label_batches WHERE name=$1 AND tenant_id=$2',
+      [batch, tenantId()],
+    );
     const batchId = b[0].id;
 
     for (const r of rows) {
       await client.query(
         `INSERT INTO label_pairs
-           (id, batch_id, source_prompt_id, task_type, prompt, reference,
+           (tenant_id, id, batch_id, source_prompt_id, task_type, prompt, reference,
             answer_a, answer_b, strategy_a, strategy_b, expected_choice, split, origin)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
          ON CONFLICT (id) DO NOTHING`,
-        [r.id, batchId, r.source_prompt_id, r.task_type, r.prompt, r.reference,
+        [tenantId(), r.id, batchId, r.source_prompt_id, r.task_type, r.prompt, r.reference,
           r.answer_a, r.answer_b, r.strategy_a, r.strategy_b, r.expected_choice, r.split, r.origin],
       );
     }
@@ -248,12 +283,15 @@ async function main() {
     console.log(`\n已写入批次 ${batch}：${written.count} 组 A/B，等待人工标注`);
   }
 
-  const q = await query('SELECT count(*) AS n, count(*) FILTER (WHERE NOT labeled) AS pending FROM v_label_queue');
+  const q = await query(
+    'SELECT count(*) AS n, count(*) FILTER (WHERE NOT labeled) AS pending FROM v_label_queue WHERE tenant_id = $1',
+    [tenantId()],
+  );
   console.log('队列状态：', q.rows[0]);
   await closePool();
 }
 
-main().catch(async (e) => {
+runInTenant(main).catch(async (e) => {
   console.error('生成失败：', e.message);
   await closePool().catch(() => {});
   process.exit(1);
